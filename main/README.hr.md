@@ -128,11 +128,16 @@ Ova podmapa sadrzi glavni firmware projekta `ZVONKO v. 1.0` za `Arduino Mega 256
 - ulaz za nadzor mreznog napona radi `UPS` moda
 - LED lampice za `ZVONO 1`, `ZVONO 2`, `SLAVLJENJE`, `MRTVACKO`, `SUNCE JUTRO`, `SUNCE PODNE` i `SUNCE VECER`
 - 6 direktnih tipki lokalnog izbornika: `GORE`, `DOLJE`, `LIJEVO`, `DESNO`, `DA`, `NE`
+- lokalni ulazi `SUNCE JUTRO`, `SUNCE PODNE` i `SUNCE VECER` rade kao trenutne servisne tipke
+  - svaki pritisak prebaci stanje odgovarajuceg suncevog dogadaja
+  - pripadna LED lampica stalno svijetli dok je funkcija ukljucena, a treperi dok to zvonjenje traje
 - uredivanje polozaja okretne ploce u izborniku ide samo po valjanim koracima od `15 min`
 - glavni LCD u `UPS modu` prikazuje `NEMA STRUJE!`, a ponedjeljak skracuje u `PON.` radi urednog prikaza datuma
 - prvi red LCD-a koristi polja `11-13` za `NTP`, `MAN`, `ERR` ili `---`, dok polja `15-16` prikazuju temperaturu `DS3231` modula
 - zvjezdica aktivnosti `*`, oznaka `R/N` i `W` za `WiFi` vise se ne prikazuju na glavnom retku
 - dvotocke trepere u ritmu `1/2 SQW` samo dok `main/zvonjenje.cpp`, `main/otkucavanje.cpp`, `main/kazaljke_sata.cpp` ili `main/okretna_ploca.cpp` trenutno rade, ili kad `WiFi` nije spojen
+- drzanje `GORE` ili `DOLJE` u lokalnom LCD meniju sada ubrzava uredjivanje brojcanih vrijednosti
+  - ubrzanje je ograniceno samo na brojcana polja i ne dira obicne `ON/OFF` opcije ni samo listanje menija
 
 ## ✅ Smjernice za razvoj
 

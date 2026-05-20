@@ -3,10 +3,53 @@
 
 namespace {
 
+const char* const ESP_KONTROLNI_TOKENI[] = {
+    "ACK:",
+    "ERR:",
+    "WIFI:",
+    "NTP:",
+    "NTPLOG:",
+    "STATUS:",
+    "CFGREQ",
+    "SETREQ:",
+    "SETCFG:",
+    "CMD:"};
+
+char* pronadiUgradeniKontrolniToken(char* linija, size_t pocetniPomak) {
+  if (linija == nullptr) {
+    return nullptr;
+  }
+
+  char* najbolji = nullptr;
+  for (size_t i = 0; i < (sizeof(ESP_KONTROLNI_TOKENI) / sizeof(ESP_KONTROLNI_TOKENI[0])); ++i) {
+    char* pronadeno = strstr(linija + pocetniPomak, ESP_KONTROLNI_TOKENI[i]);
+    if (pronadeno != nullptr && (najbolji == nullptr || pronadeno < najbolji)) {
+      najbolji = pronadeno;
+    }
+  }
+
+  return najbolji;
+}
+
+void odsjeciUgradeniKontrolniTokenAkoTreba(char* linija, size_t pocetniPomak) {
+  char* ugradeniToken = pronadiUgradeniKontrolniToken(linija, pocetniPomak);
+  if (ugradeniToken == nullptr) {
+    return;
+  }
+
+  *ugradeniToken = '\0';
+  trimJednolinijskiTekstESP(linija);
+}
+
 bool jePrepoznataESPLinija(const char* linija) {
   return strcmp(linija, "WIFI:CONNECTED") == 0 ||
          strcmp(linija, "WIFI:DISCONNECTED") == 0 ||
          strncmp(linija, "WIFI:", 5) == 0 ||
+         strncmp(linija, "WIFI RX:", 8) == 0 ||
+         strncmp(linija, "ACK:", 4) == 0 ||
+         strncmp(linija, "ERR:", 4) == 0 ||
+         strcmp(linija, "ESP BOOT") == 0 ||
+         strncmp(linija, "FAZA:", 5) == 0 ||
          strcmp(linija, "CFGREQ") == 0 ||
          strncmp(linija, "SETUPWIFI:", 10) == 0 ||
          strcmp(linija, "SETREQ:SUSTAV") == 0 ||
@@ -30,6 +73,28 @@ bool jePrepoznataESPLinija(const char* linija) {
          strncmp(linija, "NTPLOG:", 7) == 0;
 }
 
+bool obradiPomocnuESPDijagnostikuLiniju(char* linija) {
+  if (linija == nullptr || linija[0] == '\0') {
+    return false;
+  }
+
+  if (strncmp(linija, "WIFI RX:", 8) == 0) {
+    odsjeciUgradeniKontrolniTokenAkoTreba(linija, 8);
+    logirajLinijuESP(F("Mrezni most log: "), linija);
+    return true;
+  }
+
+  if (strncmp(linija, "ACK:", 4) == 0 ||
+      strncmp(linija, "ERR:", 4) == 0 ||
+      strcmp(linija, "ESP BOOT") == 0 ||
+      strncmp(linija, "FAZA:", 5) == 0) {
+    logirajLinijuESP(F("Mrezni most log: "), linija);
+    return true;
+  }
+
+  return false;
+}
+
 }  // namespace
 
 void obradiESPRedak() {
@@ -44,7 +109,8 @@ void obradiESPRedak() {
     logirajLinijuESP(F("Mrezni most linija: "), ulazniBuffer);
   }
 
-  if (obradiESPWiFiINtpLiniju(ulazniBuffer) ||
+  if (obradiPomocnuESPDijagnostikuLiniju(ulazniBuffer) ||
+      obradiESPWiFiINtpLiniju(ulazniBuffer) ||
       obradiESPPostavkeLiniju(ulazniBuffer) ||
       obradiESPStatusnuLiniju(ulazniBuffer)) {
     resetirajUlazniBuffer();

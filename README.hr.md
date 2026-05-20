@@ -78,6 +78,10 @@
 - servisni dashboard na `ESP` sada koristi glavne tipke `MUSKO`, `ZENSKO`, `SLAVI`, `BRECA`, jednokratne pogrebne tipke `POKOJNIK` i `POKOJNICA`, sunceve tipke `JUTRO`, `PODNE`, `VECER` i crveni toggle `TIHI MOD`
 - `POKOJNIK` pokrece `MUSKO` zvono `2 minute`, ceka zavrsetak inercije pa zatim pokrece `MRTVACKO` `10 minuta`
 - `POKOJNICA` pokrece `ZENSKO` zvono `2 minute`, ceka zavrsetak inercije pa zatim pokrece `MRTVACKO` `10 minuta`
+- lokalni ulazi `JUTRO`, `PODNE` i `VECER` na `Megi` rade kao trenutne servisne tipke
+  - svaki pritisak prebaci stanje odgovarajuceg suncevog dogadaja
+  - pripadna LED lampica stalno svijetli dok je dogadaj omogucen
+  - lampica treperi dok to zvonjenje upravo traje
 - kroz `/settings` i `/blagdani` `ESP32` sada moze sigurno uredjivati `Sustav`, `Stapice`, `BAT`, `Sunce`, redovite mise i unaprijed zadane blagdanske mise, bez diranja vremena, datuma, kazaljki i okretne ploce
 - dnevna misa pokrece samo `MUSKO` zvono `30 min` prije upisanog vremena mise `HH:MM`
 - nedjeljna i blagdanska misa pokrecu nedjeljno zvonjenje oba zvona `2 h` i `1 h` prije upisanog vremena mise `HH:MM`, bez dodatnog `slavljenja`
@@ -127,6 +131,9 @@
 - dvotocke u vremenu trepere u ritmu `1/2 SQW` samo kad toranjski sat nesto radi ili kad `WiFi` nije spojen
 - ako je `WiFi` spojen i mehanika miruje, dvotocke ostaju stalno upaljene
 - dok vrijeme nije potvrdeno, glavni prikaz ostaje u sigurnom `ERR` modu i ne prikazuje neprovjereno `RTC` vrijeme kao da je ispravno
+- u lokalnom LCD meniju drzanje `GORE` ili `DOLJE` sada ubrzava uredjivanje brojcanih vrijednosti
+  - to vrijedi samo za brojcana polja poput vremena, `BAT` sati, polozaja/vremena ploce, impulsa cekica, inercije i slicnih servisnih vrijednosti
+  - ne ubrzava obicne `ON/OFF` opcije ni samo listanje menija
 
 ## ⚠️ Ponašanje Kod Gresaka
 

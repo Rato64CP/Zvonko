@@ -32,5 +32,6 @@ void inicijalizirajMenuSistem();
 void upravljajMenuSistemom();
 void obradiKluc(KeyEvent event);
 MenuState dohvatiMenuState();
+bool jePonavljanjeTipkeZaMeniDozvoljeno(KeyEvent event);
 void povratakNaGlavniPrikaz();
 void osvjeziLCDZaMeni();

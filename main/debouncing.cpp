@@ -12,6 +12,12 @@ static const uint8_t PINOVI_DEBOUNCEA[] = {
   PIN_ULAZA_PLOCE_3,
   PIN_ULAZA_PLOCE_4,
   PIN_ULAZA_PLOCE_5,
+  PIN_TIPKA_GORE,
+  PIN_TIPKA_DOLJE,
+  PIN_TIPKA_LIJEVO,
+  PIN_TIPKA_DESNO,
+  PIN_TIPKA_DA,
+  PIN_TIPKA_NE,
   PIN_TIPKA_SUNCE_JUTRO,
   PIN_TIPKA_SUNCE_PODNE,
   PIN_TIPKA_SUNCE_VECER,
@@ -103,4 +109,12 @@ bool obradiDebouncedInput(uint8_t pinNumber, uint8_t debounceTimeMs, SwitchState
 
   *novoStanje = pinStanja[indeks].trenutnoStanje;
   return false;
+}
+
+SwitchState dohvatiDebouncedState(uint8_t pinNumber) {
+  const int indeks = pronadiIndeksPina(pinNumber);
+  if (indeks < 0) {
+    return SWITCH_RELEASED;
+  }
+  return pinStanja[indeks].trenutnoStanje;
 }

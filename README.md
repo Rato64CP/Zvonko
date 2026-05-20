@@ -137,6 +137,10 @@ The tower clock must remain operational even if the network layer is unavailable
   - starts the female bell for `2 minutes`
   - waits for inertia to finish
   - starts funeral ringing for `10 minutes`
+- the local `JUTRO`, `PODNE`, and `VECER` inputs on the `Mega` are momentary service buttons
+  - each press toggles the corresponding sun event
+  - the related LED stays on while the event is enabled
+  - the LED blinks while that sun event is currently ringing
 
 ### Web settings
 
@@ -244,6 +248,9 @@ When changing EEPROM layout or recovery logic, always review:
   - or WiFi is disconnected
 - if WiFi is connected and the mechanism is idle, the colon remains steadily lit
 - until time is confirmed, the display stays in safe `ERR` mode and does not show unverified RTC time as valid
+- in the local LCD menu, holding `UP` or `DOWN` now accelerates numeric editing
+  - this applies only to numeric fields such as time, BAT hours, plate position/time, hammer impulse, inertia, and similar service values
+  - it does not accelerate simple `ON/OFF` options or plain menu navigation
 
 ## ⚠️ Error behavior
 

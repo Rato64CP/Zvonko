@@ -14,3 +14,6 @@ void inicijalizirajDebouncing();
 // Obrada jednog digitalnog ulaza kroz debounce
 // Vraca true ako se stabilno stanje promijenilo
 bool obradiDebouncedInput(uint8_t pinNumber, uint8_t debounceTimeMs, SwitchState* novoStanje);
+
+// Dohvat zadnjeg stabilnog debounce stanja bez nove obrade ulaza
+SwitchState dohvatiDebouncedState(uint8_t pinNumber);

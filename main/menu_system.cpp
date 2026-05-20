@@ -1752,6 +1752,41 @@ MenuState dohvatiMenuState() {
   return trenutnoStanje;
 }
 
+bool jePonavljanjeTipkeZaMeniDozvoljeno(KeyEvent event) {
+  if (event != KEY_UP && event != KEY_DOWN) {
+    return false;
+  }
+
+  switch (trenutnoStanje) {
+    case MENU_STATE_CLOCK_SETTINGS:
+      return faza_postavki_maticnog_sata <= 4;
+
+    case MENU_STATE_HAND_SETTINGS:
+      return true;
+
+    case MENU_STATE_PLATE_SETTINGS:
+      return faza_postavki_ploce >= 1;
+
+    case MENU_STATE_SYSTEM_SETTINGS:
+      return odabraniIndex >= 5;
+
+    case MENU_STATE_QUIET_HOURS:
+      return faza_tihih_sati <= 1;
+
+    case MENU_STATE_NAIL_SETTINGS:
+      return true;
+
+    case MENU_STATE_SUNCE_SETTINGS:
+      return !jeStranicaNocneRasvjeteUSuncu() && faza_postavki_sunca == 2;
+
+    case MENU_STATE_HOLIDAY_SETTINGS:
+      return stranica_postavki_blagdana == 1 && faza_postavki_blagdana >= 1;
+
+    default:
+      return false;
+  }
+}
+
 void povratakNaGlavniPrikaz() {
   trenutnoStanje = MENU_STATE_DISPLAY_TIME;
   odabraniIndex = 0;

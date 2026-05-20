@@ -52,6 +52,21 @@ bool jeValjanaIPv4AdresaZaLCD(const char* tekst) {
   return brojSegmenata == 4;
 }
 
+const char* dohvatiZadnjuValjanuIPv4IzRetka(const char* tekst) {
+  if (tekst == nullptr) {
+    return nullptr;
+  }
+
+  const char* zadnjiKandidat = tekst;
+  const char* trazeni = tekst;
+  while ((trazeni = strstr(trazeni, "WIFI:LOCAL_IP:")) != nullptr) {
+    zadnjiKandidat = trazeni + 14;
+    trazeni += 14;
+  }
+
+  return zadnjiKandidat;
+}
+
 bool jeSiguranProzorZaNTPZahtjev(const DateTime& sada) {
   return sada.second() >= NTP_SIGURNA_SEKUNDA_MIN &&
          sada.second() <= NTP_SIGURNA_SEKUNDA_MAX;
@@ -395,7 +410,7 @@ bool obradiESPWiFiINtpLiniju(const char* linija) {
   }
 
   if (strncmp(linija, "WIFI:LOCAL_IP:", 14) == 0) {
-    const char* ipAdresa = linija + 14;
+    const char* ipAdresa = dohvatiZadnjuValjanuIPv4IzRetka(linija + 14);
     potvrdiWiFiPovezanostAkoTreba(F("Mrezni most status mreze: spojeno (potvrda preko lokalne IP)"));
 
     if (jeValjanaIPv4AdresaZaLCD(ipAdresa)) {
