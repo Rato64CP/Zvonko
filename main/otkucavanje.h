@@ -7,6 +7,9 @@ void inicijalizirajOtkucavanje();
 // Upravljanje otkucavanjem u loop-u
 void upravljajOtkucavanjem();
 
+// Brzi sigurnosni refresh releja cekica radi ujednacenijeg trajanja impulsa.
+void osvjeziSigurnosniLimitCekica();
+
 // Otkucaj broj udara na cekicu 1
 void otkucajSate(int broj);
 

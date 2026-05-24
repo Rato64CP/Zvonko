@@ -3,6 +3,20 @@
 
 namespace {
 
+const char* const ESP_WLAN_NTP_TOKENI[] = {
+    "WIFI:",
+    "WIFISTATUS",
+    "NTP:",
+    "NTPLOG:",
+    "SLANJE:",
+    "ACK:",
+    "ERR:",
+    "STATUS:",
+    "CFGREQ",
+    "SETREQ:",
+    "SETCFG:",
+    "CMD:"};
+
 bool vrijemeProslo(unsigned long sadaMs, unsigned long ciljMs) {
   return static_cast<long>(sadaMs - ciljMs) >= 0;
 }
@@ -67,6 +81,69 @@ const char* dohvatiZadnjuValjanuIPv4IzRetka(const char* tekst) {
   return zadnjiKandidat;
 }
 
+const char* pronadiUgradeniKontrolniTokenUWifiNtpLiniji(const char* tekst) {
+  if (tekst == nullptr) {
+    return nullptr;
+  }
+
+  const char* najbolji = nullptr;
+  for (size_t i = 0; i < (sizeof(ESP_WLAN_NTP_TOKENI) / sizeof(ESP_WLAN_NTP_TOKENI[0])); ++i) {
+    const char* pronadeno = strstr(tekst, ESP_WLAN_NTP_TOKENI[i]);
+    if (pronadeno != nullptr && pronadeno != tekst &&
+        (najbolji == nullptr || pronadeno < najbolji)) {
+      najbolji = pronadeno;
+    }
+  }
+  return najbolji;
+}
+
+bool pocinjeKontrolnimTokenom(const char* tekst) {
+  if (tekst == nullptr) {
+    return false;
+  }
+
+  for (size_t i = 0; i < (sizeof(ESP_WLAN_NTP_TOKENI) / sizeof(ESP_WLAN_NTP_TOKENI[0])); ++i) {
+    const size_t duljina = strlen(ESP_WLAN_NTP_TOKENI[i]);
+    if (strncmp(tekst, ESP_WLAN_NTP_TOKENI[i], duljina) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void kopirajPayloadDoSljedecegTokena(const char* ulaz,
+                                     char* izlaz,
+                                     size_t velicinaIzlaza,
+                                     const char** ostatakLinije) {
+  if (izlaz == nullptr || velicinaIzlaza == 0) {
+    if (ostatakLinije != nullptr) {
+      *ostatakLinije = nullptr;
+    }
+    return;
+  }
+
+  izlaz[0] = '\0';
+  if (ulaz == nullptr) {
+    if (ostatakLinije != nullptr) {
+      *ostatakLinije = nullptr;
+    }
+    return;
+  }
+
+  const char* token = pronadiUgradeniKontrolniTokenUWifiNtpLiniji(ulaz);
+  const size_t duljina =
+      (token != nullptr) ? static_cast<size_t>(token - ulaz) : strlen(ulaz);
+  const size_t kopija =
+      (duljina < (velicinaIzlaza - 1U)) ? duljina : (velicinaIzlaza - 1U);
+  memcpy(izlaz, ulaz, kopija);
+  izlaz[kopija] = '\0';
+  trimJednolinijskiTekstESP(izlaz);
+
+  if (ostatakLinije != nullptr) {
+    *ostatakLinije = token;
+  }
+}
+
 bool jeSiguranProzorZaNTPZahtjev(const DateTime& sada) {
   return sada.second() >= NTP_SIGURNA_SEKUNDA_MIN &&
          sada.second() <= NTP_SIGURNA_SEKUNDA_MAX;
@@ -89,6 +166,9 @@ bool mehanikaTornjskogSataMirujeZaNTP() {
     return false;
   }
 
+  // NTP smije ici tek kad je mehanika toranjskog sata i mirna i vec
+  // poravnata na trenutno potvrdeno RTC vrijeme. Time izbjegavamo da
+  // nova NTP sinkronizacija krene dok kazaljke ili ploca jos sustizu sat.
   if (jeVrijemePotvrdjenoZaAutomatiku() &&
       (!suKazaljkeUSinkronu() || !jePlocaUSinkronu())) {
     return false;
@@ -386,7 +466,8 @@ bool parsirajNTPPayload(const char* payload,
 }
 
 bool obradiESPWiFiINtpLiniju(const char* linija) {
-  if (strcmp(linija, "WIFI:CONNECTED") == 0) {
+  if (strncmp(linija, "WIFI:CONNECTED", 14) == 0 &&
+      (linija[14] == '\0' || pocinjeKontrolnimTokenom(linija + 14))) {
     const bool bioSpojen = wifiPovezanNaESP;
     wifiPovezanNaESP = true;
     postaviWiFiStatus(true);
@@ -396,21 +477,36 @@ bool obradiESPWiFiINtpLiniju(const char* linija) {
       zadnjiAutomatskiNtpZahtjevSatniKljuc = NTP_KLJUC_NEPOSTAVLJEN;
     }
     posaljiPCLog(F("Mrezni most status mreze: spojeno"));
+    if (linija[14] != '\0') {
+      obradiESPWiFiINtpLiniju(linija + 14);
+    }
     return true;
   }
 
-  if (strcmp(linija, "WIFI:DISCONNECTED") == 0) {
+  if (strncmp(linija, "WIFI:DISCONNECTED", 17) == 0 &&
+      (linija[17] == '\0' || pocinjeKontrolnimTokenom(linija + 17))) {
     wifiPovezanNaESP = false;
     postaviWiFiStatus(false);
     prioritetniNtpZahtjevNaCekanju = false;
     zadnjiAutomatskiNtpZahtjevMinutniKljuc = NTP_KLJUC_NEPOSTAVLJEN;
     zadnjiAutomatskiNtpZahtjevSatniKljuc = NTP_KLJUC_NEPOSTAVLJEN;
     posaljiPCLog(F("Mrezni most status mreze: odspojeno"));
+    if (linija[17] != '\0') {
+      obradiESPWiFiINtpLiniju(linija + 17);
+    }
     return true;
   }
 
   if (strncmp(linija, "WIFI:LOCAL_IP:", 14) == 0) {
-    const char* ipAdresa = dohvatiZadnjuValjanuIPv4IzRetka(linija + 14);
+    const char* payload = linija + 14;
+    if (pocinjeKontrolnimTokenom(payload)) {
+      return obradiESPWiFiINtpLiniju(payload);
+    }
+
+    char ipBuffer[24];
+    const char* ostatakLinije = nullptr;
+    kopirajPayloadDoSljedecegTokena(payload, ipBuffer, sizeof(ipBuffer), &ostatakLinije);
+    const char* ipAdresa = dohvatiZadnjuValjanuIPv4IzRetka(ipBuffer);
     potvrdiWiFiPovezanostAkoTreba(F("Mrezni most status mreze: spojeno (potvrda preko lokalne IP)"));
 
     if (jeValjanaIPv4AdresaZaLCD(ipAdresa)) {
@@ -423,28 +519,50 @@ bool obradiESPWiFiINtpLiniju(const char* linija) {
     } else {
       logirajLinijuESP(F("Mrezni most: neispravna lokalna IP: "), ipAdresa);
     }
+
+    if (ostatakLinije != nullptr) {
+      obradiESPWiFiINtpLiniju(ostatakLinije);
+    }
     return true;
   }
 
   if (strncmp(linija, "WIFI:LCD:", 9) == 0) {
     const char* payload = linija + 9;
-    if (payload[0] != '\0') {
-      prikaziWiFiDijagnostiku(payload);
+    if (pocinjeKontrolnimTokenom(payload)) {
+      return obradiESPWiFiINtpLiniju(payload);
+    }
+
+    char lcdBuffer[32];
+    const char* ostatakLinije = nullptr;
+    kopirajPayloadDoSljedecegTokena(payload, lcdBuffer, sizeof(lcdBuffer), &ostatakLinije);
+    if (lcdBuffer[0] != '\0') {
+      prikaziWiFiDijagnostiku(lcdBuffer);
 
       char log[48];
       snprintf_P(log,
                  sizeof(log),
                  PSTR("Mrezni most WiFi LCD sazetak: %s"),
-                 payload);
+                 lcdBuffer);
       posaljiPCLog(log);
+    }
+
+    if (ostatakLinije != nullptr) {
+      obradiESPWiFiINtpLiniju(ostatakLinije);
     }
     return true;
   }
 
   if (strncmp(linija, "WIFI:MAC:", 9) == 0) {
-    const char* macAdresa = linija + 9;
-    if (strlen(macAdresa) == 17) {
-      strncpy(zadnjaWiFiMACAdresa, macAdresa, sizeof(zadnjaWiFiMACAdresa) - 1);
+    const char* payload = linija + 9;
+    if (pocinjeKontrolnimTokenom(payload)) {
+      return obradiESPWiFiINtpLiniju(payload);
+    }
+
+    char macBuffer[24];
+    const char* ostatakLinije = nullptr;
+    kopirajPayloadDoSljedecegTokena(payload, macBuffer, sizeof(macBuffer), &ostatakLinije);
+    if (strlen(macBuffer) == 17) {
+      strncpy(zadnjaWiFiMACAdresa, macBuffer, sizeof(zadnjaWiFiMACAdresa) - 1);
       zadnjaWiFiMACAdresa[sizeof(zadnjaWiFiMACAdresa) - 1] = '\0';
 
       char log[48];
@@ -454,28 +572,53 @@ bool obradiESPWiFiINtpLiniju(const char* linija) {
                  zadnjaWiFiMACAdresa);
       posaljiPCLog(log);
     } else {
-      logirajLinijuESP(F("Mrezni most: neispravna MAC adresa: "), macAdresa);
+      logirajLinijuESP(F("Mrezni most: neispravna MAC adresa: "), macBuffer);
+    }
+
+    if (ostatakLinije != nullptr) {
+      obradiESPWiFiINtpLiniju(ostatakLinije);
     }
     return true;
   }
 
   if (strncmp(linija, "WIFI:", 5) == 0) {
     const char* poruka = linija + 5;
-    while (*poruka == ' ') {
-      ++poruka;
+    if (pocinjeKontrolnimTokenom(poruka)) {
+      return obradiESPWiFiINtpLiniju(poruka);
     }
-    logirajLinijuESP(F("Mrezni most WiFi: "), poruka);
+
+    char porukaBuffer[96];
+    const char* ostatakLinije = nullptr;
+    kopirajPayloadDoSljedecegTokena(poruka, porukaBuffer, sizeof(porukaBuffer), &ostatakLinije);
+    const char* porukaZaLog = porukaBuffer;
+    while (*porukaZaLog == ' ') {
+      ++porukaZaLog;
+    }
+    if (porukaZaLog[0] != '\0') {
+      logirajLinijuESP(F("Mrezni most WiFi: "), porukaZaLog);
+    }
+    if (ostatakLinije != nullptr) {
+      obradiESPWiFiINtpLiniju(ostatakLinije);
+    }
     return true;
   }
 
   if (strncmp(linija, "NTPLOG:", 7) == 0) {
-    const char* poruka = linija + 7;
-    while (*poruka == ' ') {
-      ++poruka;
+    const char* payload = linija + 7;
+    if (pocinjeKontrolnimTokenom(payload)) {
+      return obradiESPWiFiINtpLiniju(payload);
     }
+
+    char porukaBuffer[96];
+    const char* ostatakLinije = nullptr;
+    kopirajPayloadDoSljedecegTokena(payload, porukaBuffer, sizeof(porukaBuffer), &ostatakLinije);
+    const char* poruka = porukaBuffer;
 
     if (strncmp(poruka, "osvjezeno, epoch=", 17) == 0) {
       ntpCekanjePrijavljeno = false;
+      if (ostatakLinije != nullptr) {
+        obradiESPWiFiINtpLiniju(ostatakLinije);
+      }
       return true;
     }
 
@@ -484,16 +627,30 @@ bool obradiESPWiFiINtpLiniju(const char* linija) {
         posaljiPCLog(F("Mrezni most NTP: jos nije postavljeno vrijeme"));
         ntpCekanjePrijavljeno = true;
       }
+      if (ostatakLinije != nullptr) {
+        obradiESPWiFiINtpLiniju(ostatakLinije);
+      }
       return true;
     }
 
     ntpCekanjePrijavljeno = false;
     logirajLinijuESP(F("Mrezni most NTP: "), poruka);
+    if (ostatakLinije != nullptr) {
+      obradiESPWiFiINtpLiniju(ostatakLinije);
+    }
     return true;
   }
 
   if (strncmp(linija, "NTP:", 4) == 0) {
-    const char* iso = linija + 4;
+    const char* payload = linija + 4;
+    if (pocinjeKontrolnimTokenom(payload)) {
+      return obradiESPWiFiINtpLiniju(payload);
+    }
+
+    char isoBuffer[40];
+    const char* ostatakLinije = nullptr;
+    kopirajPayloadDoSljedecegTokena(payload, isoBuffer, sizeof(isoBuffer), &ostatakLinije);
+    const char* iso = isoBuffer;
     DateTime ntpVrijeme;
     uint16_t ntpMilisekunde = 0;
     bool imaEksplicitanDST = false;
@@ -522,6 +679,9 @@ bool obradiESPWiFiINtpLiniju(const char* linija) {
       logirajLinijuESP(F("Primljen NTP iz ESP-a: "), iso);
     } else {
       logirajLinijuESP(F("Preskocen NTP iz ESP-a jer je NTP iskljucen: "), iso);
+    }
+    if (ostatakLinije != nullptr) {
+      obradiESPWiFiINtpLiniju(ostatakLinije);
     }
     return true;
   }

@@ -62,6 +62,19 @@ bool jeAutomatikaKazaljkiBlokirana() {
          !jeVrijemePotvrdjenoZaAutomatiku();
 }
 
+bool dohvatiSvjeziRtcSnapshotZaKazaljke(DateTime& rtcVrijeme, uint32_t& rtcTick) {
+  // Ako SQW preklopi tocno izmedu citanja vremena i brojaca tickova,
+  // ponovi jednom kako bi odluka o koraku koristila uskladen par.
+  for (uint8_t pokusaj = 0; pokusaj < 2; ++pokusaj) {
+    rtcVrijeme = dohvatiTrenutnoVrijeme();
+    rtcTick = dohvatiRtcSekundniBrojac();
+    if (jeVrijemeSvjezeZaRtcTick(rtcTick)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 int izracunajDvanaestSatneMinute(const DateTime& vrijeme) {
   return (vrijeme.hour() % 12) * 60 + vrijeme.minute();
 }
@@ -117,7 +130,6 @@ void obradiJedanKorak(EepromLayout::UnifiedMotionState& stanje) {
     stanje.hand_position = static_cast<uint16_t>((stanje.hand_position + 1) % BROJ_MINUTA_CIKLUS);
     stanje.hand_active = HAND_NEAKTIVNO;
     stanje.hand_relay = HAND_RELEJ_NIJEDAN;
-    stanje.hand_start_ms = 0;
     aktivniKorakStartRtcTick = 0;
     aktivirajRelejeKazaljki(stanje);
     UnifiedMotionStateStore::spremiAkoPromjena(stanje);
@@ -127,23 +139,23 @@ void obradiJedanKorak(EepromLayout::UnifiedMotionState& stanje) {
 }
 
 void pokreniKorakAkoTreba(EepromLayout::UnifiedMotionState& stanje) {
-  const EepromLayout::UnifiedMotionState najnovijeStanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  const EepromLayout::UnifiedMotionState najnovijeStanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   stanje = najnovijeStanje;
-  const uint32_t rtcTick = dohvatiRtcSekundniBrojac();
   if (stanje.hand_active != HAND_NEAKTIVNO) {
+    return;
+  }
+  DateTime rtcVrijeme((uint32_t)0);
+  uint32_t rtcTick = 0;
+  if (jeRtcIzlazniFailSafeAktivan()) {
+    return;
+  }
+  if (!dohvatiSvjeziRtcSnapshotZaKazaljke(rtcVrijeme, rtcTick)) {
     return;
   }
   if (rtcTick == zadnjiObradeniRtcTick) {
     return;
   }
   zadnjiObradeniRtcTick = rtcTick;
-  const DateTime rtcVrijeme = dohvatiTrenutnoVrijeme();
-  if (jeRtcIzlazniFailSafeAktivan()) {
-    return;
-  }
-  if (!jeVrijemeSvjezeZaRtcTick(rtcTick)) {
-    return;
-  }
   if ((rtcVrijeme.second() % 6) != 0) {
     return;
   }
@@ -161,11 +173,10 @@ void pokreniKorakAkoTreba(EepromLayout::UnifiedMotionState& stanje) {
 
   stanje.hand_active = HAND_AKTIVNO;
   stanje.hand_relay = odrediRelejKazaljki(stanje);
-  stanje.hand_start_ms = 0;
   aktivniKorakStartRtcTick = rtcTick;
   aktivirajRelejeKazaljki(stanje);
   UnifiedMotionStateStore::spremiAkoPromjena(stanje);
-  const EepromLayout::UnifiedMotionState potvrdenoStanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  const EepromLayout::UnifiedMotionState potvrdenoStanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   if (potvrdenoStanje.hand_active == HAND_AKTIVNO &&
       potvrdenoStanje.hand_relay == stanje.hand_relay) {
     posaljiLogKazaljkiStarta(potvrdenoStanje.hand_relay, cilj);
@@ -187,13 +198,12 @@ void inicijalizirajKazaljke() {
     return;
   }
 
-  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   if (stanje.hand_active != HAND_NEAKTIVNO) {
     // Aktivni impuls iz stare sesije ne smije se direktno vratiti na relej pri bootu,
-    // jer je hand_start_ms vezan uz stari millis() i moze odmah isteci kao kratki bljesak.
+    // jer je toranjski sat u meduvremenu izgubio stvarno trajanje tog koraka.
     stanje.hand_active = HAND_NEAKTIVNO;
     stanje.hand_relay = HAND_RELEJ_NIJEDAN;
-    stanje.hand_start_ms = 0;
     UnifiedMotionStateStore::spremiAkoPromjena(stanje);
     posaljiPCLog(F("Kazaljke: pronaden aktivni impuls iz stare sesije, vracam u mirno stanje"));
   }
@@ -226,13 +236,12 @@ void upravljajKorekcijomKazaljki() {
     return;
   }
 
-  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
 
   if (!jeRtcSqwAktivan()) {
     if (stanje.hand_active != HAND_NEAKTIVNO || stanje.hand_relay != HAND_RELEJ_NIJEDAN) {
       stanje.hand_active = HAND_NEAKTIVNO;
       stanje.hand_relay = HAND_RELEJ_NIJEDAN;
-      stanje.hand_start_ms = 0;
       aktivniKorakStartRtcTick = 0;
       UnifiedMotionStateStore::spremiAkoPromjena(stanje);
       ugasiRelejeKazaljki();
@@ -245,7 +254,6 @@ void upravljajKorekcijomKazaljki() {
     if (stanje.hand_active != HAND_NEAKTIVNO || stanje.hand_relay != HAND_RELEJ_NIJEDAN) {
       stanje.hand_active = HAND_NEAKTIVNO;
       stanje.hand_relay = HAND_RELEJ_NIJEDAN;
-      stanje.hand_start_ms = 0;
       aktivniKorakStartRtcTick = 0;
       UnifiedMotionStateStore::spremiAkoPromjena(stanje);
       if (rucnaBlokadaKazaljki) {
@@ -294,11 +302,10 @@ void postaviRucnuBlokaduKazaljki(bool blokirano) {
   zadnjiObradeniRtcTick = 0;
   aktivniKorakStartRtcTick = 0;
 
-  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   if (blokirano) {
     stanje.hand_active = HAND_NEAKTIVNO;
     stanje.hand_relay = HAND_RELEJ_NIJEDAN;
-    stanje.hand_start_ms = 0;
     UnifiedMotionStateStore::spremiAkoPromjena(stanje);
     ugasiRelejeKazaljki();
     posaljiPCLog(F("Kazaljke: ukljucena rucna blokada za namjestanje"));
@@ -317,7 +324,7 @@ bool mozeSeRucnoNamjestatiKazaljke() {
   if (!imaKazaljkeSata()) {
     return true;
   }
-  return UnifiedMotionStateStore::dohvatiIliMigriraj().hand_active == HAND_NEAKTIVNO;
+  return UnifiedMotionStateStore::dohvatiIliInicijaliziraj().hand_active == HAND_NEAKTIVNO;
 }
 
 void postaviRucnuPozicijuKazaljki(int satKazaljke, int minutaKazaljke) {
@@ -327,11 +334,10 @@ void postaviRucnuPozicijuKazaljki(int satKazaljke, int minutaKazaljke) {
   satKazaljke = constrain(satKazaljke, 0, 11);
   minutaKazaljke = constrain(minutaKazaljke, 0, 59);
 
-  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   stanje.hand_position = static_cast<uint16_t>((satKazaljke * 60 + minutaKazaljke) % BROJ_MINUTA_CIKLUS);
   stanje.hand_active = HAND_NEAKTIVNO;
   stanje.hand_relay = HAND_RELEJ_NIJEDAN;
-  stanje.hand_start_ms = 0;
   aktivniKorakStartRtcTick = 0;
   aktivirajRelejeKazaljki(stanje);
   UnifiedMotionStateStore::spremiAkoPromjena(stanje);
@@ -342,13 +348,12 @@ void pomakniKazaljkeZa(int brojMinuta) {
   if (!imaKazaljkeSata()) {
     return;
   }
-  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   int nova = static_cast<int>(stanje.hand_position) + brojMinuta;
   while (nova < 0) nova += BROJ_MINUTA_CIKLUS;
   stanje.hand_position = static_cast<uint16_t>(nova % BROJ_MINUTA_CIKLUS);
   stanje.hand_active = HAND_NEAKTIVNO;
   stanje.hand_relay = HAND_RELEJ_NIJEDAN;
-  stanje.hand_start_ms = 0;
   aktivniKorakStartRtcTick = 0;
   UnifiedMotionStateStore::spremiAkoPromjena(stanje);
 }
@@ -362,13 +367,13 @@ bool suKazaljkeUSinkronu() {
     return false;
   }
 
-  const EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  const EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   return stanje.hand_active == HAND_NEAKTIVNO &&
          stanje.hand_position == izracunajDvanaestSatneMinute(dohvatiTrenutnoVrijeme());
 }
 
 int dohvatiMemoriraneKazaljkeMinuta() {
-  return UnifiedMotionStateStore::dohvatiIliMigriraj().hand_position;
+  return UnifiedMotionStateStore::dohvatiIliInicijaliziraj().hand_position;
 }
 
 void obavijestiKazaljkeDSTPromjena(int) {
@@ -383,11 +388,10 @@ void postaviTrenutniPolozajKazaljki(int trenutnaMinuta) {
     return;
   }
   trenutnaMinuta = constrain(trenutnaMinuta, 0, BROJ_MINUTA_CIKLUS - 1);
-  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   stanje.hand_position = static_cast<uint16_t>(trenutnaMinuta);
   stanje.hand_active = HAND_NEAKTIVNO;
   stanje.hand_relay = HAND_RELEJ_NIJEDAN;
-  stanje.hand_start_ms = 0;
   aktivniKorakStartRtcTick = 0;
   UnifiedMotionStateStore::spremiAkoPromjena(stanje);
 }

@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <avr/wdt.h>
 #include "watchdog.h"
+#include "podesavanja_piny.h"
 #include "pc_serial.h"
 
 // ==================== WATCHDOG SETUP ====================
@@ -9,6 +10,13 @@
 static uint8_t zadnje_reset_zastavice = 0;
 static bool reset_zastavice_ucitane = false;
 static bool watchdog_inicijaliziran = false;
+
+static void postaviCekiceUSigurnoStanjePrijeReseta() {
+  digitalWrite(PIN_CEKIC_MUSKI, LOW);
+  digitalWrite(PIN_CEKIC_ZENSKI, LOW);
+  pinMode(PIN_CEKIC_MUSKI, OUTPUT);
+  pinMode(PIN_CEKIC_ZENSKI, OUTPUT);
+}
 
 void pripremiResetFlagsMCU() {
   if (reset_zastavice_ucitane) {
@@ -63,6 +71,7 @@ void osvjeziWatchdogAkoJeAktivan() {
 void zatraziResetWatchdogom() {
   posaljiPCLog(F("WDT: trazen kontrolirani servisni reset toranjskog sata"));
   delay(20);
+  postaviCekiceUSigurnoStanjePrijeReseta();
   cli();
   wdt_disable();
   wdt_enable(WDTO_15MS);

@@ -289,7 +289,7 @@ void pokreniSekvencuOtkucavanja(VrstaOtkucavanja vrsta,
   pokreniSljedeciUdarac();
 }
 
-void primijeniSigurnosniLimitCekica(unsigned long sadaUs, unsigned long sadaMs) {
+void primijeniSigurnosniLimitCekicaInternal(unsigned long sadaUs, unsigned long sadaMs) {
   for (int indeks = 0; indeks < 2; ++indeks) {
     if (!sigurnostCekica.aktivan[indeks]) {
       continue;
@@ -315,6 +315,10 @@ void primijeniSigurnosniLimitCekica(unsigned long sadaUs, unsigned long sadaMs) 
 }
 
 }  // namespace
+
+void osvjeziSigurnosniLimitCekica() {
+  primijeniSigurnosniLimitCekicaInternal(micros(), millis());
+}
 
 bool jeOperacijaCekicaDozvoljena() {
   if (blokadaOtkucavanja || jeGlobalnaBlokadaOtkucavanjaAktivna()) {
@@ -449,7 +453,7 @@ void upravljajOtkucavanjem() {
     return;
   }
 
-  primijeniSigurnosniLimitCekica(sadaUs, sadaMs);
+  primijeniSigurnosniLimitCekicaInternal(sadaUs, sadaMs);
   upravljajSlavljenjemIMrtvackim(sadaMs);
 
   if (jeLiInerciaAktivna()) {

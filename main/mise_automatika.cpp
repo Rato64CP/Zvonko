@@ -218,8 +218,17 @@ static void pokreniMisu(TipMiseAutomatike tip,
     aktivirajZvonjenjeNaTrajanje(MUSKO_ZVONO, trajanjeZvonaMs);
   } else {
     const uint8_t brojZvona = dohvatiBrojZvona();
-    for (uint8_t zvono = 1; zvono <= brojZvona; ++zvono) {
-      aktivirajZvonjenjeNaTrajanje(zvono, trajanjeZvonaMs);
+    if (brojZvona >= 2) {
+      unsigned long trajanjeZvona1Ms = trajanjeZvonaMs;
+      unsigned long trajanjeZvona2Ms = trajanjeZvonaMs;
+      izracunajTrajanjaDvajuZvonaZaSinkroniZavrsetak(
+          trajanjeZvonaMs, trajanjeZvona1Ms, trajanjeZvona2Ms);
+      aktivirajZvonjenjeNaTrajanje(1, trajanjeZvona1Ms);
+      aktivirajZvonjenjeNaTrajanje(2, trajanjeZvona2Ms);
+    } else {
+      for (uint8_t zvono = 1; zvono <= brojZvona; ++zvono) {
+        aktivirajZvonjenjeNaTrajanje(zvono, trajanjeZvonaMs);
+      }
     }
   }
   logirajPorukuMise(tip, F("pokrenuto"), indeksUnosa, minutePrijeMise, true);

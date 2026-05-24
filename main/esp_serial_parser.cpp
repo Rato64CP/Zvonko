@@ -7,8 +7,10 @@ const char* const ESP_KONTROLNI_TOKENI[] = {
     "ACK:",
     "ERR:",
     "WIFI:",
+    "WIFISTATUS",
     "NTP:",
     "NTPLOG:",
+    "SLANJE:",
     "STATUS:",
     "CFGREQ",
     "SETREQ:",
@@ -50,6 +52,7 @@ bool jePrepoznataESPLinija(const char* linija) {
          strncmp(linija, "ERR:", 4) == 0 ||
          strcmp(linija, "ESP BOOT") == 0 ||
          strncmp(linija, "FAZA:", 5) == 0 ||
+         strncmp(linija, "SLANJE:", 7) == 0 ||
          strcmp(linija, "CFGREQ") == 0 ||
          strncmp(linija, "SETUPWIFI:", 10) == 0 ||
          strcmp(linija, "SETREQ:SUSTAV") == 0 ||
@@ -87,7 +90,8 @@ bool obradiPomocnuESPDijagnostikuLiniju(char* linija) {
   if (strncmp(linija, "ACK:", 4) == 0 ||
       strncmp(linija, "ERR:", 4) == 0 ||
       strcmp(linija, "ESP BOOT") == 0 ||
-      strncmp(linija, "FAZA:", 5) == 0) {
+      strncmp(linija, "FAZA:", 5) == 0 ||
+      strncmp(linija, "SLANJE:", 7) == 0) {
     logirajLinijuESP(F("Mrezni most log: "), linija);
     return true;
   }

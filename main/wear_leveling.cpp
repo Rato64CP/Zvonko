@@ -105,9 +105,6 @@ bool jeMetaZaAktivniSegment(const MetaWearLeveling& meta) {
     (meta.baznaAdresa == EepromLayout::BAZA_POSTAVKE &&
      meta.brojSlotova == EepromLayout::SLOTOVI_POSTAVKE &&
      meta.velicinaSlota == EepromLayout::SLOT_SIZE_POSTAVKE) ||
-    (meta.baznaAdresa == EepromLayout::BAZA_UNIFIED_STANJE &&
-     meta.brojSlotova == EepromLayout::SLOTOVI_UNIFIED_STANJE &&
-     meta.velicinaSlota == EepromLayout::SLOT_SIZE_UNIFIED_STANJE) ||
     (meta.baznaAdresa == EepromLayout::BAZA_DST_STATUS &&
      meta.brojSlotova == EepromLayout::SLOTOVI_DST_STATUS &&
      meta.velicinaSlota == EepromLayout::SLOT_SIZE_DST_STATUS) ||

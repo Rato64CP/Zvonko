@@ -358,6 +358,12 @@ static void ocistiSegmenteNakonPromjeneLayouta() {
       EepromLayout::BAZA_POSTAVKE,
       EepromLayout::SLOTOVI_POSTAVKE * EepromLayout::SLOT_SIZE_POSTAVKE);
   uspjeh &= obrisiSegmentEeproma(
+      EepromLayout::BAZA_BOOT_FLAGS,
+      EepromLayout::SLOTOVI_BOOT_FLAGS * EepromLayout::SLOT_SIZE_BOOT_FLAGS);
+  uspjeh &= obrisiSegmentEeproma(
+      EepromLayout::BAZA_UNIFIED_STANJE,
+      EepromLayout::SLOTOVI_UNIFIED_STANJE * EepromLayout::SLOT_SIZE_UNIFIED_STANJE);
+  uspjeh &= obrisiSegmentEeproma(
       EepromLayout::BAZA_DST_STATUS,
       EepromLayout::SLOTOVI_DST_STATUS * EepromLayout::SLOT_SIZE_DST_STATUS);
   uspjeh &= obrisiSegmentEeproma(

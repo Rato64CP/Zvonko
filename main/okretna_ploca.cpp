@@ -21,7 +21,6 @@ constexpr int POZICIJA_NOCI = 63;
 constexpr int MINUTNI_BLOK = 15;
 constexpr uint8_t DEBOUNCE_ULAZA_PLOCE_MS = 75;
 constexpr uint8_t SEKUNDA_CITANJA_CAVALA = 25;
-constexpr unsigned long RAZLIKA_GASENJA_ZVONA_BEZ_KOCNICE_MS = 30000UL;
 
 constexpr uint8_t FAZA_STABILNO = 0;
 constexpr uint8_t FAZA_PRVI_RELEJ = 1;
@@ -79,6 +78,19 @@ void procitajStabilnaStanjaUlazaPloce(bool ulazi[BROJ_ULAZA_PLOCE]) {
 
 bool jePosebniNacinAktivan(PosebniAutomatskiNacin nacin) {
   return (nacin == POSEBNI_NACIN_SLAVLJENJE) && jeSlavljenjeUTijeku();
+}
+
+bool dohvatiSvjeziRtcSnapshotZaPlocu(DateTime& rtcVrijeme, uint32_t& rtcTick) {
+  // Ako SQW preklopi tocno izmedu citanja vremena i brojaca tickova,
+  // ponovi jednom kako bi odluka o koraku koristila uskladen par.
+  for (uint8_t pokusaj = 0; pokusaj < 2; ++pokusaj) {
+    rtcVrijeme = dohvatiTrenutnoVrijeme();
+    rtcTick = dohvatiRtcSekundniBrojac();
+    if (jeVrijemeSvjezeZaRtcTick(rtcTick)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void pokreniPosebniNacin(PosebniAutomatskiNacin nacin) {
@@ -180,21 +192,21 @@ void obradiKorak(EepromLayout::UnifiedMotionState& stanje) {
 }
 
 void pokreniKorakAkoTreba(EepromLayout::UnifiedMotionState& stanje) {
-  const uint32_t rtcTick = dohvatiRtcSekundniBrojac();
   if (stanje.plate_phase != FAZA_STABILNO) {
+    return;
+  }
+  DateTime rtcVrijeme((uint32_t)0);
+  uint32_t rtcTick = 0;
+  if (jeRtcIzlazniFailSafeAktivan()) {
+    return;
+  }
+  if (!dohvatiSvjeziRtcSnapshotZaPlocu(rtcVrijeme, rtcTick)) {
     return;
   }
   if (rtcTick == zadnjiObradeniRtcTick) {
     return;
   }
   zadnjiObradeniRtcTick = rtcTick;
-  const DateTime rtcVrijeme = dohvatiTrenutnoVrijeme();
-  if (jeRtcIzlazniFailSafeAktivan()) {
-    return;
-  }
-  if (!jeVrijemeSvjezeZaRtcTick(rtcTick)) {
-    return;
-  }
   if ((rtcVrijeme.second() % 6) != 0) {
     return;
   }
@@ -484,6 +496,7 @@ void obradiUlazePloce(const DateTime& now,
       static_cast<unsigned long>(dohvatiOdgoduSlavljenjaSekunde()) * 1000UL;
   const bool slavljenjeAktivno = jeCavaoAktivan(ulazi, brojMjestaZaCavle, cavaoSlavljenja);
   bool aktivnaZvonaNaCavlima[BROJ_ZVONA_MAX] = {false, false};
+  unsigned long trajanjeZvonaPoZvonu[BROJ_ZVONA_MAX] = {trajanjeZvona, trajanjeZvona};
 
   for (uint8_t zvono = 1; zvono <= brojZvona && zvono <= BROJ_ZVONA_MAX; ++zvono) {
     const uint8_t cavao = jeNedjelja ? dohvatiCavaoNedjeljaZaZvono(zvono)
@@ -494,6 +507,11 @@ void obradiUlazePloce(const DateTime& now,
   const bool obaZvonaNaPlociAktivna =
       aktivnaZvonaNaCavlima[0] && aktivnaZvonaNaCavlima[1] && !jeKocnicaZvonaOmogucena();
 
+  if (obaZvonaNaPlociAktivna) {
+    izracunajTrajanjaDvajuZvonaZaSinkroniZavrsetak(
+        trajanjeZvona, trajanjeZvonaPoZvonu[0], trajanjeZvonaPoZvonu[1]);
+  }
+
   bool imaZvono = false;
   for (uint8_t zvono = 1; zvono <= brojZvona && zvono <= BROJ_ZVONA_MAX; ++zvono) {
     const uint8_t cavao = jeNedjelja ? dohvatiCavaoNedjeljaZaZvono(zvono)
@@ -502,13 +520,7 @@ void obradiUlazePloce(const DateTime& now,
       continue;
     }
 
-    unsigned long trajanjeZvonaZaOvoZvono = trajanjeZvona;
-    if (obaZvonaNaPlociAktivna && zvono == 1) {
-      trajanjeZvonaZaOvoZvono =
-          (trajanjeZvona > RAZLIKA_GASENJA_ZVONA_BEZ_KOCNICE_MS)
-              ? (trajanjeZvona - RAZLIKA_GASENJA_ZVONA_BEZ_KOCNICE_MS)
-              : 0UL;
-    }
+    const unsigned long trajanjeZvonaZaOvoZvono = trajanjeZvonaPoZvonu[zvono - 1];
 
     if (trajanjeZvonaZaOvoZvono == 0UL || protekloOdTerminaMs >= trajanjeZvonaZaOvoZvono) {
       continue;
@@ -560,7 +572,7 @@ void inicijalizirajPlocu() {
 
   for (uint8_t i = 0; i < BROJ_ULAZA_PLOCE; ++i) pinMode(PIN_ULAZA_PLOCE[i], INPUT_PULLUP);
 
-  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   if (stanje.plate_phase != FAZA_STABILNO) {
     // Aktivna faza iz stare sesije ne smije se vratiti direktno na releje pri bootu,
     // nego je treba odraditi ponovno punim korakom na sljedecoj 6-sekundnoj granici.
@@ -598,7 +610,7 @@ void upravljajPlocom() {
   static bool prethodniUPSModAktivan = false;
 
   if (jeRtcIzlazniFailSafeAktivan() || !jeVrijemePotvrdjenoZaAutomatiku()) {
-    EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+    EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
     if (stanje.plate_phase != FAZA_STABILNO) {
       stanje.plate_phase = FAZA_STABILNO;
       UnifiedMotionStateStore::spremiAkoPromjena(stanje);
@@ -646,7 +658,7 @@ void upravljajPlocom() {
         millis(), ulaziPloce, jeNedjelja, brojMjestaZaCavle, cavaoSlavljenjaAktivan);
   }
 
-  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
 
   if (!jeRtcSqwAktivan()) {
     if (stanje.plate_phase != FAZA_STABILNO) {
@@ -702,7 +714,7 @@ void upravljajPlocom() {
 }
 
 void postaviTrenutniPolozajPloce(int pozicija) {
-  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   stanje.plate_position = static_cast<uint8_t>(constrain(pozicija, 0, BROJ_POZICIJA - 1));
   stanje.plate_phase = FAZA_STABILNO;
   pocetakFazeRtcTick = 0;
@@ -710,7 +722,7 @@ void postaviTrenutniPolozajPloce(int pozicija) {
 }
 
 int dohvatiPozicijuPloce() {
-  return UnifiedMotionStateStore::dohvatiIliMigriraj().plate_position;
+  return UnifiedMotionStateStore::dohvatiIliInicijaliziraj().plate_position;
 }
 
 bool jePlocaUSinkronu() {
@@ -718,7 +730,7 @@ bool jePlocaUSinkronu() {
     return false;
   }
 
-  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   return stanje.plate_phase == FAZA_STABILNO &&
          stanje.plate_position == izracunajCiljnuPoziciju(dohvatiTrenutnoVrijeme());
 }
@@ -746,5 +758,5 @@ bool jeRucnaBlokadaPloceAktivna() {
 }
 
 bool mozeSeRucnoNamjestatiPloca() {
-  return UnifiedMotionStateStore::dohvatiIliMigriraj().plate_phase == FAZA_STABILNO;
+  return UnifiedMotionStateStore::dohvatiIliInicijaliziraj().plate_phase == FAZA_STABILNO;
 }

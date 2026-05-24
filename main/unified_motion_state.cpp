@@ -7,7 +7,6 @@
 #include "i2c_eeprom.h"
 #include "pc_serial.h"
 #include "time_glob.h"
-#include "wear_leveling.h"
 
 namespace UnifiedMotionStateStore {
 namespace {
@@ -18,6 +17,7 @@ constexpr uint8_t HAND_RELEJ_NIJEDAN = 0;
 constexpr uint8_t FAZA_STABILNO = 0;
 constexpr uint8_t UNIFIED_VERZIJA = EepromLayout::UNIFIED_STANJE_VERZIJA;
 constexpr uint8_t RESERVED_SEKVENCA_POCETNA = 1;
+
 bool cacheInicijaliziran = false;
 int cacheSlot = -1;
 EepromLayout::UnifiedMotionState cacheStanje{};
@@ -27,8 +27,6 @@ uint16_t izracunajChecksum(const EepromLayout::UnifiedMotionState& stanje) {
   checksum += stanje.hand_position;
   checksum += stanje.hand_active;
   checksum += stanje.hand_relay;
-  checksum += (stanje.hand_start_ms >> 16) & 0xFFFF;
-  checksum += stanje.hand_start_ms & 0xFFFF;
   checksum += stanje.plate_position;
   checksum += stanje.plate_phase;
   checksum += stanje.version;
@@ -69,16 +67,30 @@ uint8_t sljedecaSekvenca(uint8_t trenutna) {
   return (kandidat == 0) ? RESERVED_SEKVENCA_POCETNA : kandidat;
 }
 
-bool ucitajNajnovijeStanje(EepromLayout::UnifiedMotionState& stanje, int* slotNajnoviji = nullptr) {
+bool dekodirajRawSlot(const uint8_t* raw, EepromLayout::UnifiedMotionState& stanje) {
+  EepromLayout::UnifiedMotionState kandidat{};
+  memcpy(&kandidat, raw, sizeof(kandidat));
+  if (!jeValjanoStanje(kandidat)) {
+    return false;
+  }
+
+  stanje = kandidat;
+  return true;
+}
+
+bool ucitajNajnovijeStanje(EepromLayout::UnifiedMotionState& stanje,
+                           int* slotNajnoviji = nullptr) {
   bool pronadeno = false;
   uint8_t najboljaSekvenca = 0;
   int najboljiSlot = -1;
 
   for (int slot = 0; slot < EepromLayout::SLOTOVI_UNIFIED_STANJE; ++slot) {
+    uint8_t raw[EepromLayout::SLOT_SIZE_UNIFIED_STANJE] = {};
     EepromLayout::UnifiedMotionState kandidat{};
     const int adresa =
-      EepromLayout::BAZA_UNIFIED_STANJE + slot * static_cast<int>(sizeof(EepromLayout::UnifiedMotionState));
-    if (!VanjskiEEPROM::procitaj(adresa, &kandidat, sizeof(kandidat)) || !jeValjanoStanje(kandidat)) {
+        EepromLayout::BAZA_UNIFIED_STANJE + slot * EepromLayout::SLOT_SIZE_UNIFIED_STANJE;
+    if (!VanjskiEEPROM::procitaj(adresa, raw, sizeof(raw)) ||
+        !dekodirajRawSlot(raw, kandidat)) {
       continue;
     }
 
@@ -100,7 +112,7 @@ bool ucitajNajnovijeStanje(EepromLayout::UnifiedMotionState& stanje, int* slotNa
 
 int adresaSlota(int slot) {
   return EepromLayout::BAZA_UNIFIED_STANJE +
-         slot * static_cast<int>(sizeof(EepromLayout::UnifiedMotionState));
+         slot * EepromLayout::SLOT_SIZE_UNIFIED_STANJE;
 }
 
 bool zapisiDirektnoSlot(int slot, const EepromLayout::UnifiedMotionState& stanje) {
@@ -108,7 +120,10 @@ bool zapisiDirektnoSlot(int slot, const EepromLayout::UnifiedMotionState& stanje
     return false;
   }
 
-  const bool uspjeh = VanjskiEEPROM::zapisi(adresaSlota(slot), &stanje, sizeof(stanje));
+  uint8_t raw[EepromLayout::SLOT_SIZE_UNIFIED_STANJE] = {};
+  memcpy(raw, &stanje, sizeof(stanje));
+
+  const bool uspjeh = VanjskiEEPROM::zapisi(adresaSlota(slot), raw, sizeof(raw));
   if (!uspjeh) {
     char log[64];
     snprintf_P(log, sizeof(log), PSTR("UnifiedMotionState: EEPROM zapis nije uspio, slot=%d"), slot);
@@ -128,47 +143,16 @@ bool jednakoLogickoStanje(EepromLayout::UnifiedMotionState lijevo,
   return memcmp(&lijevo, &desno, sizeof(lijevo)) == 0;
 }
 
-void ucitajLegacyKazaljke(uint16_t& handPosition) {
-  // Legacy migracija ostaje kako bi toranjski sat nakon nadogradnje
-  // i dalje mogao povuci zadnju poznatu poziciju kazaljki iz starog segmenta.
-  int legacyK = 0;
-  if (!WearLeveling::ucitaj(EepromLayout::BAZA_KAZALJKE,
-                            EepromLayout::SLOTOVI_KAZALJKE,
-                            legacyK)) {
-    legacyK = izracunajDvanaestSatneMinute();
-  }
-  handPosition = static_cast<uint16_t>((legacyK % BROJ_MINUTA_CIKLUS + BROJ_MINUTA_CIKLUS) % BROJ_MINUTA_CIKLUS);
-}
-
-void ucitajLegacyPlocu(uint8_t& platePosition, uint8_t& platePhase) {
-  // Legacy migracija ostaje kako bi se staro stanje okretne ploce
-  // jednokratno preuzelo u novi UnifiedMotionState model.
-  struct LegacyPloce { char zapis[4]; } legacy{};
-  if (!WearLeveling::ucitaj(EepromLayout::BAZA_STANJE_PLOCE,
-                            EepromLayout::SLOTOVI_STANJE_PLOCE,
-                            legacy)) {
-    return;
-  }
-
-  if (legacy.zapis[0] >= '0' && legacy.zapis[0] <= '9' &&
-      legacy.zapis[1] >= '0' && legacy.zapis[1] <= '9') {
-    const int poz = (legacy.zapis[0] - '0') * 10 + (legacy.zapis[1] - '0');
-    if (poz >= 0 && poz < BROJ_POZICIJA_PLOCE) {
-      platePosition = static_cast<uint8_t>(poz);
-      platePhase = (legacy.zapis[2] == 'P') ? 1 : FAZA_STABILNO;
-    }
-  }
-}
-
 EepromLayout::UnifiedMotionState inicijalnoStanje() {
   EepromLayout::UnifiedMotionState stanje{};
-  ucitajLegacyKazaljke(stanje.hand_position);
+  stanje.hand_position =
+      static_cast<uint16_t>((izracunajDvanaestSatneMinute() % BROJ_MINUTA_CIKLUS +
+                             BROJ_MINUTA_CIKLUS) %
+                            BROJ_MINUTA_CIKLUS);
   stanje.hand_active = HAND_NEAKTIVNO;
   stanje.hand_relay = HAND_RELEJ_NIJEDAN;
-  stanje.hand_start_ms = 0;
   stanje.plate_position = 63;
   stanje.plate_phase = FAZA_STABILNO;
-  ucitajLegacyPlocu(stanje.plate_position, stanje.plate_phase);
   stanje.version = UNIFIED_VERZIJA;
   stanje.reserved = RESERVED_SEKVENCA_POCETNA;
   stanje.checksum = izracunajChecksum(stanje);
@@ -206,7 +190,7 @@ bool ucitaj(EepromLayout::UnifiedMotionState& stanje) {
   return true;
 }
 
-EepromLayout::UnifiedMotionState dohvatiIliMigriraj() {
+EepromLayout::UnifiedMotionState dohvatiIliInicijaliziraj() {
   EepromLayout::UnifiedMotionState stanje{};
   if (ucitaj(stanje)) {
     return stanje;
@@ -242,11 +226,9 @@ void spremiAkoPromjena(const EepromLayout::UnifiedMotionState& stanje) {
   stanjeZaSpremanje.checksum = izracunajChecksum(stanjeZaSpremanje);
 
   // UnifiedMotionState vec ima vlastitu sekvencu (`reserved`) i skeniranje
-  // svih konfiguriranih slotova pri citanju. Checksum dodatno stiti
-  // kazaljke i okretnu plocu od djelomicnog zapisa pri nestanku napajanja,
-  // pa ovdje namjerno i dalje ne koristimo zajednicki wear-leveling meta-zapis.
-  // Time cuvamo kompatibilni memorijski raspored od nepotrebnog trosenja istog meta bloka bez promjene
-  // recovery logike toranjskog sata.
+  // svih konfiguriranih slotova pri citanju. Veci broj slotova dodatno smanjuje
+  // trosenje `24C32 EEPROM-a`, pa ovdje i dalje namjerno ne koristimo
+  // zajednicki wear-leveling meta-zapis za toranjski sat.
   const int sljedeciSlot =
       (trenutniSlot >= 0) ? ((trenutniSlot + 1) % EepromLayout::SLOTOVI_UNIFIED_STANJE) : 0;
   if (!zapisiDirektnoSlot(sljedeciSlot, stanjeZaSpremanje)) {

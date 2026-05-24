@@ -104,6 +104,7 @@ void setup() {
 
 void loop() {
   osvjeziWatchdog();
+  osvjeziSigurnosniLimitCekica();
 
   if (jeSafeModeAktivan()) {
     primijeniSafeModeAkoTreba();

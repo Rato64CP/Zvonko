@@ -15,8 +15,9 @@
 static const uint8_t BROJ_ZVONA_MAX = 2;
 static const uint8_t BROJ_RUCNIH_SKLOPKI_ZVONA = 2;
 static const unsigned long INTERVAL_TREPTANJA_LAMPICE_INERCIJE_MS = 500UL;
-static const unsigned long DODATNI_RAD_BELL2_BEZ_KOCNICE_MS = 30000UL;
 static const unsigned long MAKS_TRAJANJE_RUCNE_SKLOPKE_ZVONA_MS = 30UL * 60UL * 1000UL;
+static const unsigned long MIN_RAD_ZA_PUNU_INERCIJU_BEZ_KOCNICE_MS = 20000UL;
+static const unsigned long PROZOR_CEKANJA_DRUGOG_GASENJA_BEZ_KOCNICE_MS = 2000UL;
 
 static const uint8_t PINOVI_ZVONA[BROJ_ZVONA_MAX] = {
   PIN_ZVONO_1,
@@ -55,10 +56,19 @@ static struct {
   unsigned long vrijeme_ukljucenja_ms[BROJ_RUCNIH_SKLOPKI_ZVONA];
 } manualnoUpravljanje = {};
 
+static struct {
+  bool aktivno;
+  uint8_t prvo_zvono;
+  unsigned long vrijeme_prvog_zahtjeva_ms;
+} sinkroniziranoGasenjeNaCekanju = {};
+
+
 static bool dozvoliPaljenjeZvonaIzRucneSklopke = false;
 static bool globalnaBlokadaZvona = false;
 static bool blokadaZvonaTihiRezim = false;
 static bool blokadaZvonaUPS = false;
+static bool produzeniZavrsetakBezKocniceAktivan = false;
+static uint8_t produzeniZavrsetakBezKocniceZvono = 0;
 
 // ==================== RELAY CONTROL ====================
 
@@ -84,17 +94,82 @@ static unsigned long dohvatiTrajanjeInercijeZvonaMs(int indeks) {
   return 0UL;
 }
 
+static unsigned long dohvatiDosadasnjeTrajanjeRadaZvonaMs(int indeks, unsigned long sadaMs) {
+  if (!jeValjanIndeksZvona(indeks) || !zvona.aktivan[indeks]) {
+    return 0UL;
+  }
+
+  return sadaMs - zvona.start_ms[indeks];
+}
+
+static unsigned long apsolutnaRazlikaULong(unsigned long prvi, unsigned long drugi) {
+  return (prvi >= drugi) ? (prvi - drugi) : (drugi - prvi);
+}
+
+static bool jePunaInercijaDostupnaZaObaZvona(unsigned long trajanjeZvona1Ms,
+                                             unsigned long trajanjeZvona2Ms) {
+  return trajanjeZvona1Ms >= MIN_RAD_ZA_PUNU_INERCIJU_BEZ_KOCNICE_MS &&
+         trajanjeZvona2Ms >= MIN_RAD_ZA_PUNU_INERCIJU_BEZ_KOCNICE_MS;
+}
+
+static unsigned long skratiTrajanjeUzMinimalniRad(unsigned long baznoTrajanjeMs,
+                                                  unsigned long skracenjeMs) {
+  if (baznoTrajanjeMs <= MIN_RAD_ZA_PUNU_INERCIJU_BEZ_KOCNICE_MS || skracenjeMs == 0UL) {
+    return baznoTrajanjeMs;
+  }
+
+  if (baznoTrajanjeMs <= (MIN_RAD_ZA_PUNU_INERCIJU_BEZ_KOCNICE_MS + skracenjeMs)) {
+    return MIN_RAD_ZA_PUNU_INERCIJU_BEZ_KOCNICE_MS;
+  }
+
+  return baznoTrajanjeMs - skracenjeMs;
+}
+
+static void ponistiCekanjeSinkroniziranogGasenja() {
+  sinkroniziranoGasenjeNaCekanju.aktivno = false;
+  sinkroniziranoGasenjeNaCekanju.prvo_zvono = 0;
+  sinkroniziranoGasenjeNaCekanju.vrijeme_prvog_zahtjeva_ms = 0UL;
+}
+
+static void ponistiProduzeniZavrsetakBezKocnice() {
+  produzeniZavrsetakBezKocniceAktivan = false;
+  produzeniZavrsetakBezKocniceZvono = 0;
+}
+
+static void oznaciProduzeniZavrsetakBezKocnice(int zvono) {
+  if (zvono < 1 || zvono > BROJ_ZVONA_MAX) {
+    return;
+  }
+
+  produzeniZavrsetakBezKocniceAktivan = true;
+  produzeniZavrsetakBezKocniceZvono = static_cast<uint8_t>(zvono);
+}
+
+static bool treperiLampicaZbogCekanjaDrugogGasenja(int indeks) {
+  return jeValjanIndeksZvona(indeks) &&
+         sinkroniziranoGasenjeNaCekanju.aktivno &&
+         sinkroniziranoGasenjeNaCekanju.prvo_zvono == static_cast<uint8_t>(indeks + 1);
+}
+
+static bool treperiLampicaZbogProduzenogZavrsetkaBezKocnice(int indeks) {
+  return jeValjanIndeksZvona(indeks) &&
+         produzeniZavrsetakBezKocniceAktivan &&
+         produzeniZavrsetakBezKocniceZvono == static_cast<uint8_t>(indeks + 1);
+}
+
 static void osvjeziLampicuZvona(int indeks, unsigned long sadaMs) {
   if (!jeValjanIndeksZvona(indeks)) {
     return;
   }
 
   bool lampicaUkljucena = false;
-  if (zvona.aktivan[indeks]) {
-    lampicaUkljucena = true;
-  } else if (inercija.aktivna[indeks]) {
+  if (treperiLampicaZbogCekanjaDrugogGasenja(indeks) ||
+      treperiLampicaZbogProduzenogZavrsetkaBezKocnice(indeks) ||
+      inercija.aktivna[indeks]) {
     lampicaUkljucena =
         ((sadaMs / INTERVAL_TREPTANJA_LAMPICE_INERCIJE_MS) % 2UL) == 0UL;
+  } else if (zvona.aktivan[indeks]) {
+    lampicaUkljucena = true;
   }
 
   digitalWrite(PINOVI_LAMPICA_ZVONA[indeks], lampicaUkljucena ? HIGH : LOW);
@@ -198,7 +273,105 @@ static void zakaziProduzeniRadZvona(int zvono, unsigned long dodatnoTrajanjeMs) 
 
   zvona.start_ms[indeks] = millis();
   zvona.duration_ms[indeks] = dodatnoTrajanjeMs;
+  oznaciProduzeniZavrsetakBezKocnice(zvono);
   osvjeziLampicuZvona(indeks, zvona.start_ms[indeks]);
+}
+
+static bool suObaZvonaDovoljnoDugoRadilaZaSinkroniziranoGasenje() {
+  const unsigned long sadaMs = millis();
+  return jePunaInercijaDostupnaZaObaZvona(
+      dohvatiDosadasnjeTrajanjeRadaZvonaMs(0, sadaMs),
+      dohvatiDosadasnjeTrajanjeRadaZvonaMs(1, sadaMs));
+}
+
+static bool mozePokrenutiCekanjeSinkroniziranogGasenja(int zvono) {
+  const int indeks = zvono - 1;
+  const int drugiIndeks = (indeks == 0) ? 1 : 0;
+  return !jeKocnicaZvonaOmogucena() &&
+         jeValjanIndeksZvona(indeks) &&
+         jeValjanIndeksZvona(drugiIndeks) &&
+         zvona.aktivan[indeks] &&
+         zvona.aktivan[drugiIndeks] &&
+         suObaZvonaDovoljnoDugoRadilaZaSinkroniziranoGasenje();
+}
+
+static void pokreniCekanjeSinkroniziranogGasenja(int zvono) {
+  sinkroniziranoGasenjeNaCekanju.aktivno = true;
+  sinkroniziranoGasenjeNaCekanju.prvo_zvono = static_cast<uint8_t>(zvono);
+  sinkroniziranoGasenjeNaCekanju.vrijeme_prvog_zahtjeva_ms = millis();
+
+  char log[128];
+  snprintf_P(log,
+             sizeof(log),
+             PSTR("Zvona: prvo rucno/daljinsko gasenje ZVONO%d, cekam drugo do %lus radi sinkronog zavrsetka bez kocnice"),
+             zvono,
+             static_cast<unsigned long>(PROZOR_CEKANJA_DRUGOG_GASENJA_BEZ_KOCNICE_MS / 1000UL));
+  posaljiPCLog(log);
+}
+
+static void primijeniSinkroniziranoGasenjeIzCekanja() {
+  const unsigned long inercijaZvona1Ms = dohvatiTrajanjeInercijeZvonaMs(0);
+  const unsigned long inercijaZvona2Ms = dohvatiTrajanjeInercijeZvonaMs(1);
+  const unsigned long razlikaInercijeMs =
+      apsolutnaRazlikaULong(inercijaZvona1Ms, inercijaZvona2Ms);
+
+  if (razlikaInercijeMs == 0UL) {
+    iskljuciZvono(1);
+    iskljuciZvono(2);
+    posaljiPCLog(F("Zvona: oba OFF zahtjeva spojena u zajednicko gasenje, inercije su jednake"));
+    ponistiCekanjeSinkroniziranogGasenja();
+    return;
+  }
+
+  const int zvonoSDuljomInercijom = (inercijaZvona1Ms > inercijaZvona2Ms) ? 1 : 2;
+  const int zvonoSKracomInercijom = (zvonoSDuljomInercijom == 1) ? 2 : 1;
+  iskljuciZvono(zvonoSDuljomInercijom);
+  zakaziProduzeniRadZvona(zvonoSKracomInercijom, razlikaInercijeMs);
+
+  char log[144];
+  snprintf_P(log,
+             sizeof(log),
+             PSTR("Zvona: oba OFF zahtjeva spojena u sinkroni zavrsetak bez kocnice, prvo gasim ZVONO%d pa ostavljam ZVONO%d jos %lus"),
+             zvonoSDuljomInercijom,
+             zvonoSKracomInercijom,
+             static_cast<unsigned long>(razlikaInercijeMs / 1000UL));
+  posaljiPCLog(log);
+  ponistiCekanjeSinkroniziranogGasenja();
+}
+
+static void obradiCekanjeSinkroniziranogGasenja(unsigned long sadaMs) {
+  if (!sinkroniziranoGasenjeNaCekanju.aktivno) {
+    return;
+  }
+
+  const int prvoZvono = sinkroniziranoGasenjeNaCekanju.prvo_zvono;
+  const int drugoZvono = (prvoZvono == 1) ? 2 : 1;
+
+  if (!jeZvonoAktivno(prvoZvono)) {
+    ponistiCekanjeSinkroniziranogGasenja();
+    return;
+  }
+
+  if (!jeZvonoAktivno(drugoZvono)) {
+    ponistiCekanjeSinkroniziranogGasenja();
+    iskljuciZvono(prvoZvono);
+    return;
+  }
+
+  if ((sadaMs - sinkroniziranoGasenjeNaCekanju.vrijeme_prvog_zahtjeva_ms) <
+      PROZOR_CEKANJA_DRUGOG_GASENJA_BEZ_KOCNICE_MS) {
+    return;
+  }
+
+  char log[112];
+  snprintf_P(log,
+             sizeof(log),
+             PSTR("Zvona: drugo gasenje nije stiglo unutar %lus, ZVONO%d gasim pojedinacno"),
+             static_cast<unsigned long>(PROZOR_CEKANJA_DRUGOG_GASENJA_BEZ_KOCNICE_MS / 1000UL),
+             prvoZvono);
+  posaljiPCLog(log);
+  ponistiCekanjeSinkroniziranogGasenja();
+  iskljuciZvono(prvoZvono);
 }
 
 static void obradiSigurnosniTimeoutRucnihSklopkiZvona(unsigned long sadaMs) {
@@ -229,6 +402,34 @@ static void obradiSigurnosniTimeoutRucnihSklopkiZvona(unsigned long sadaMs) {
 
 // ==================== PUBLIC API ====================
 
+void izracunajTrajanjaDvajuZvonaZaSinkroniZavrsetak(unsigned long baznoTrajanjeMs,
+                                                    unsigned long& trajanjeZvona1Ms,
+                                                    unsigned long& trajanjeZvona2Ms) {
+  trajanjeZvona1Ms = baznoTrajanjeMs;
+  trajanjeZvona2Ms = baznoTrajanjeMs;
+
+  if (jeKocnicaZvonaOmogucena() ||
+      baznoTrajanjeMs < MIN_RAD_ZA_PUNU_INERCIJU_BEZ_KOCNICE_MS) {
+    return;
+  }
+
+  const unsigned long inercijaZvona1Ms = dohvatiTrajanjeInercijeZvonaMs(0);
+  const unsigned long inercijaZvona2Ms = dohvatiTrajanjeInercijeZvonaMs(1);
+  const unsigned long razlikaInercijeMs =
+      apsolutnaRazlikaULong(inercijaZvona1Ms, inercijaZvona2Ms);
+
+  if (razlikaInercijeMs == 0UL) {
+    return;
+  }
+
+  if (inercijaZvona1Ms > inercijaZvona2Ms) {
+    trajanjeZvona1Ms = skratiTrajanjeUzMinimalniRad(baznoTrajanjeMs, razlikaInercijeMs);
+    return;
+  }
+
+  trajanjeZvona2Ms = skratiTrajanjeUzMinimalniRad(baznoTrajanjeMs, razlikaInercijeMs);
+}
+
 void ukljuciZvono(int zvono) {
   const int indeks = zvono - 1;
   if (!jeValjanIndeksZvona(indeks) || !jeZvonoOmogucenoPoPostavkama(zvono)) {
@@ -245,6 +446,24 @@ void ukljuciZvono(int zvono) {
   if (!jeVrijemePotvrdjenoZaAutomatiku() && !dozvoliPaljenjeZvonaIzRucneSklopke) {
     posaljiPCLog(F("Zvona: automatsko ili daljinsko paljenje blokirano dok vrijeme nije potvrdeno"));
     return;
+  }
+
+  if (sinkroniziranoGasenjeNaCekanju.aktivno &&
+      sinkroniziranoGasenjeNaCekanju.prvo_zvono == static_cast<uint8_t>(zvono)) {
+    ponistiCekanjeSinkroniziranogGasenja();
+    osvjeziLampiceZvona(millis());
+
+    char log[96];
+    snprintf_P(log,
+               sizeof(log),
+               PSTR("Zvona: ponovni ON za ZVONO%d otkazuje cekanje drugog gasenja"),
+               zvono);
+    posaljiPCLog(log);
+  }
+
+  if (produzeniZavrsetakBezKocniceAktivan &&
+      produzeniZavrsetakBezKocniceZvono == static_cast<uint8_t>(zvono)) {
+    ponistiProduzeniZavrsetakBezKocnice();
   }
 
   if (!zvona.aktivan[indeks]) {
@@ -265,6 +484,11 @@ void iskljuciZvono(int zvono) {
     return;
   }
 
+  if (produzeniZavrsetakBezKocniceAktivan &&
+      produzeniZavrsetakBezKocniceZvono == static_cast<uint8_t>(zvono)) {
+    ponistiProduzeniZavrsetakBezKocnice();
+  }
+
   if (zvona.aktivan[indeks]) {
     deaktivirajBell_Relej(indeks);
     zvona.aktivan[indeks] = false;
@@ -281,6 +505,35 @@ void iskljuciZvono(int zvono) {
                static_cast<unsigned>((inercija.trajanje_ms[indeks] + 500UL) / 1000UL));
     posaljiPCLog(log);
   }
+}
+
+void zahtijevajOperatorovoGasenjeZvona(int zvono) {
+  const int indeks = zvono - 1;
+  if (!jeValjanIndeksZvona(indeks)) {
+    return;
+  }
+
+  if (!sinkroniziranoGasenjeNaCekanju.aktivno) {
+    if (mozePokrenutiCekanjeSinkroniziranogGasenja(zvono)) {
+      pokreniCekanjeSinkroniziranogGasenja(zvono);
+      return;
+    }
+
+    iskljuciZvono(zvono);
+    return;
+  }
+
+  if (sinkroniziranoGasenjeNaCekanju.prvo_zvono == static_cast<uint8_t>(zvono)) {
+    return;
+  }
+
+  if (!mozePokrenutiCekanjeSinkroniziranogGasenja(zvono)) {
+    ponistiCekanjeSinkroniziranogGasenja();
+    iskljuciZvono(zvono);
+    return;
+  }
+
+  primijeniSinkroniziranoGasenjeIzCekanja();
 }
 
 bool jeLiInerciaAktivna() {
@@ -330,6 +583,10 @@ bool jeZvonoAktivno(int zvono) {
   return zvona.aktivan[indeks];
 }
 
+bool jeProduzeniZavrsetakZvonaBezKocniceAktivan() {
+  return produzeniZavrsetakBezKocniceAktivan;
+}
+
 void aktivirajZvonjenje(int zvono) {
   ukljuciZvono(zvono);
 }
@@ -349,12 +606,39 @@ void deaktivirajZvonjenje(int zvono) {
 }
 
 void iskljuciObaZvonaSinkronizirano() {
+  ponistiCekanjeSinkroniziranogGasenja();
+  ponistiProduzeniZavrsetakBezKocnice();
   const bool obaZvonaAktivna = jeZvonoAktivno(1) && jeZvonoAktivno(2);
   if (!jeKocnicaZvonaOmogucena() && obaZvonaAktivna) {
-    iskljuciZvono(1);
-    zakaziProduzeniRadZvona(2, DODATNI_RAD_BELL2_BEZ_KOCNICE_MS);
-    posaljiPCLog(F("Zvona: bez kocnice ostavljam ZVONO2 jos 30 s nakon zajednickog gasenja"));
-    return;
+    const unsigned long sadaMs = millis();
+    const unsigned long trajanjeZvona1Ms = dohvatiDosadasnjeTrajanjeRadaZvonaMs(0, sadaMs);
+    const unsigned long trajanjeZvona2Ms = dohvatiDosadasnjeTrajanjeRadaZvonaMs(1, sadaMs);
+    if (jePunaInercijaDostupnaZaObaZvona(trajanjeZvona1Ms, trajanjeZvona2Ms)) {
+      const unsigned long inercijaZvona1Ms = dohvatiTrajanjeInercijeZvonaMs(0);
+      const unsigned long inercijaZvona2Ms = dohvatiTrajanjeInercijeZvonaMs(1);
+      const unsigned long razlikaInercijeMs =
+          apsolutnaRazlikaULong(inercijaZvona1Ms, inercijaZvona2Ms);
+
+      if (razlikaInercijeMs > 0UL) {
+        if (inercijaZvona1Ms > inercijaZvona2Ms) {
+          iskljuciZvono(1);
+          zakaziProduzeniRadZvona(2, razlikaInercijeMs);
+        } else {
+          iskljuciZvono(2);
+          zakaziProduzeniRadZvona(1, razlikaInercijeMs);
+        }
+
+        char log[120];
+        snprintf_P(log,
+                   sizeof(log),
+                   PSTR("Zvona: bez kocnice sinkroniziram kraj po inerciji (Z1=%lus, Z2=%lus, prag=%lus)"),
+                   static_cast<unsigned long>(inercijaZvona1Ms / 1000UL),
+                   static_cast<unsigned long>(inercijaZvona2Ms / 1000UL),
+                   static_cast<unsigned long>(MIN_RAD_ZA_PUNU_INERCIJU_BEZ_KOCNICE_MS / 1000UL));
+        posaljiPCLog(log);
+        return;
+      }
+    }
   }
 
   iskljuciZvono(1);
@@ -368,6 +652,8 @@ static void primijeniEfektivnuGlobalnuBlokaduZvona(bool prethodnoAktivna) {
   }
 
   if (novaBlokada) {
+    ponistiCekanjeSinkroniziranogGasenja();
+    ponistiProduzeniZavrsetakBezKocnice();
     for (uint8_t i = 0; i < BROJ_ZVONA_MAX; ++i) {
       if (!zvona.aktivan[i]) {
         continue;
@@ -440,6 +726,8 @@ void inicijalizirajZvona() {
     inercija.vrijeme_pocetka[i] = 0UL;
     inercija.trajanje_ms[i] = 0UL;
   }
+  ponistiCekanjeSinkroniziranogGasenja();
+  ponistiProduzeniZavrsetakBezKocnice();
   posaljiPCLog(F("Zvona: inicijalizirana za 2 zvona toranjskog sata"));
 }
 
@@ -449,6 +737,7 @@ void upravljajZvonom() {
   unsigned long sadaMs = millis();
   SwitchState novoStanje = SWITCH_RELEASED;
 
+  obradiCekanjeSinkroniziranogGasenja(sadaMs);
   obradiSigurnosniTimeoutRucnihSklopkiZvona(sadaMs);
 
   for (uint8_t i = 0; i < BROJ_RUCNIH_SKLOPKI_ZVONA; i++) {
@@ -477,13 +766,15 @@ void upravljajZvonom() {
         manualnoUpravljanje.override_aktivan[i] = false;
         manualnoUpravljanje.prisilno_iskljucen[i] = false;
         manualnoUpravljanje.vrijeme_ukljucenja_ms[i] = 0UL;
-        iskljuciZvono(i + 1);
+        zahtijevajOperatorovoGasenjeZvona(i + 1);
       }
       posaljiPCLog(log);
     }
   }
 
   if (jeGlobalnaBlokadaZvonaAktivna()) {
+    ponistiCekanjeSinkroniziranogGasenja();
+    ponistiProduzeniZavrsetakBezKocnice();
     for (uint8_t i = 0; i < BROJ_ZVONA_MAX; ++i) {
       if (zvona.aktivan[i]) {
         deaktivirajBell_Relej(i);

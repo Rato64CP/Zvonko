@@ -114,9 +114,9 @@ struct PostavkeSpremnik {
 };
 
 constexpr uint16_t POSTAVKE_POTPIS = 0x5453;
-// Revizija 22 dodaje ukljucivanje RS485 transporta kroz sustavske postavke.
-// Topologija 2 zvona / 5 cavala ostaje kompatibilna i ne trazi novu reviziju layouta.
-constexpr uint8_t POSTAVKE_VERZIJA = 22;
+// Revizija 23 radi namjerni "cisti rez" korisnickih postavki toranjskog sata
+// kako novi firmware vise ne bi prihvacao starije EEPROM spremnike.
+constexpr uint8_t POSTAVKE_VERZIJA = 23;
 
 constexpr int BAZA_POSTAVKE =
   BAZA_ZADNJA_SINKRONIZACIJA + (SLOTOVI_ZADNJA_SINKRONIZACIJA * SLOT_SIZE_ZADNJA_SINKRONIZACIJA);
@@ -129,9 +129,9 @@ constexpr int SLOT_SIZE_POSTAVKE = sizeof(PostavkeSpremnik);
 struct SystemStateBackup {
   uint32_t hand_position_k_minuta;
   uint32_t plate_position;
-  // Legacy zapisi koriste RTC unix timestamp, a novi recovery zapisi
-  // monotono rastucu sekvencu radi pouzdanog odabira najnovijeg slota.
-  uint32_t rtc_timestamp;
+  // Periodicki recovery backup toranjskog sata koristi monotonu sekvencu
+  // zapisa kako odabir najnovijeg slota ne bi ovisio o RTC/NTP vremenu.
+  uint32_t sekvenca_zapisa;
   uint16_t checksum;
 };
 
@@ -143,29 +143,36 @@ constexpr int SLOT_SIZE_BOOT_FLAGS = sizeof(SystemStateBackup);
 // ==================== JEDINSTVENO STANJE KRETANJA ====================
 // Jedinstveni state-model za toranjski sat (kazaljke + okretna ploca).
 
+#pragma pack(push, 1)
 struct UnifiedMotionState {
   uint16_t hand_position;
   uint8_t hand_active;
   uint8_t hand_relay;
-  uint32_t hand_start_ms;
   uint8_t plate_position;
   uint8_t plate_phase;
   uint8_t version;
   uint8_t reserved;
   uint16_t checksum;
 };
+#pragma pack(pop)
 
-// Revizija 3 dodaje checksum kako bi toranjski sat mogao odbaciti
-// djelomicno upisan ili korumpiran slot jedinstvenog stanja.
-constexpr uint8_t UNIFIED_STANJE_VERZIJA = 3;
+// Revizija 5 zadrzava kompaktan `UnifiedMotionState`, ali udvostrucuje broj
+// slotova za toranjski sat na 48. Time se smanjuje trosenje pojedinog mjesta
+// u vanjskom `24C32 EEPROM-u`, ali raspored vise nije kompatibilan sa starim
+// adresama i firmware vise ne pokusava citati starije revizije tog bloka.
+constexpr uint8_t UNIFIED_STANJE_VERZIJA = 5;
 
 constexpr int BAZA_UNIFIED_STANJE =
   BAZA_BOOT_FLAGS + (SLOTOVI_BOOT_FLAGS * SLOT_SIZE_BOOT_FLAGS);
-// Testna revizija toranjskog sata koristi 24 slota kako bi zajednicko
+// Revizija toranjskog sata koristi 48 slota kako bi zajednicko
 // stanje kazaljki i okretne ploce ravnomjernije rasporedilo zapise po
 // kompatibilnom memorijskom prostoru.
-constexpr int SLOTOVI_UNIFIED_STANJE = 24;
-constexpr int SLOT_SIZE_UNIFIED_STANJE = sizeof(UnifiedMotionState);
+constexpr int SLOTOVI_UNIFIED_STANJE = 48;
+constexpr int SLOT_SIZE_UNIFIED_STANJE = 14;
+static_assert(sizeof(UnifiedMotionState) == 10,
+              "UnifiedMotionState mora ostati 10 bajtova");
+static_assert(sizeof(UnifiedMotionState) <= SLOT_SIZE_UNIFIED_STANJE,
+              "UnifiedMotionState mora stati u kompatibilni slot");
 
 // ==================== DST STATUS TORANJSKOG SATA ====================
 // Pamti radi li toranjski sat trenutno u CET ili CEST modu kako bi
@@ -208,7 +215,7 @@ struct SunceviDogadajiSpremnik {
 };
 
 constexpr uint16_t SUNCEVI_DOGADAJI_POTPIS = 0x5344;
-constexpr uint8_t SUNCEVI_DOGADAJI_VERZIJA = 4;
+constexpr uint8_t SUNCEVI_DOGADAJI_VERZIJA = 5;
 
 constexpr int BAZA_SUNCEVI_DOGADAJI =
   BAZA_EEPROM_DIJAGNOSTIKA + VELICINA_EEPROM_DIJAGNOSTIKA;
@@ -245,7 +252,7 @@ struct BlagdaniSpremnik {
 };
 
 constexpr uint16_t BLAGDANI_POTPIS = 0x424C;
-constexpr uint8_t BLAGDANI_VERZIJA = 2;
+constexpr uint8_t BLAGDANI_VERZIJA = 3;
 
 constexpr int BAZA_BLAGDANI =
   BAZA_SUNCEVI_DOGADAJI + (SLOTOVI_SUNCEVI_DOGADAJI * SLOT_SIZE_SUNCEVI_DOGADAJI);
@@ -272,7 +279,7 @@ struct MiseSpremnik {
 };
 
 constexpr uint16_t MISE_POTPIS = 0x4D53;
-constexpr uint8_t MISE_VERZIJA = 2;
+constexpr uint8_t MISE_VERZIJA = 3;
 
 constexpr int BAZA_MISE =
   BAZA_BLAGDANI + (SLOTOVI_BLAGDANI * SLOT_SIZE_BLAGDANI);

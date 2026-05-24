@@ -10,6 +10,7 @@
 - vodi zvona, cekice, slavljenje i mrtvacko
 - podrzava odvojenu inerciju `INR1` i `INR2` za dva razlicita zvona
 - podrzava opciju `K:0/1` za rad s kocnicom zvona ili bez nje
+- kod `K=0` sinkronizira zavrsetak dvaju zvona prema stvarnoj razlici inercija, uz zastitni prag rada od `20 s` i operator-prozor do `2 s` izmedu dva `OFF`
 - uvodi termalnu zastitu slavljenja nakon `3 minute` rada kroz pauzu `3 s` svakih `30 s`
 - podrzava blagdansko slavljenje i posebni raspored mrtvackog za Svi sveti / Dusni dan
 - cuva postavke i kriticno stanje u vanjskom `24C32 EEPROM-u` ili `FM24W256 FRAM-u`
@@ -92,7 +93,8 @@
 
 - vanjska `24C32 EEPROM` ili `FM24W256 FRAM` memorija cuva postavke, `UnifiedMotionState`, DST status i kriticni backup
 - iako `FM24W256` ima veci fizicki kapacitet, firmware toranjskog sata namjerno zadrzava postojeci kompatibilni raspored unutar prvih `4096 B`, tako da obje varijante ostaju kompatibilne
-- `UnifiedMotionState` koristi `24` rotirajuca slota za kazaljke i okretnu plocu
+- aktualna revizija firmwarea namjerno ne cita starije `UnifiedMotionState`, stare periodicke recovery backup zapise ni starije verzije korisnickih EEPROM spremnika, pa nakon nadogradnje treba ponovno postaviti toranjski sat ako je ranije radio na starijem rasporedu
+- `UnifiedMotionState` koristi `48` rotirajucih slotova za kazaljke i okretnu plocu
 - svaki `UnifiedMotionState` slot ima checksum i nevaljan ili polovicno upisan zapis se preskace
 - zapis zadnje sinkronizacije vremena sada ima vlastiti checksum uz kompatibilno citanje starog formata
 - `power_recovery.*` vraca kazaljke i plocu u dosljedno stanje nakon restarta
@@ -141,7 +143,7 @@
 - kvar `ESP32`: nema utjecaja na osnovni rad kazaljki, ploce, zvona i cekica
 - reset `Mega 2560`: recovery iz spremljenog stanja
 - nestanak napajanja: nastavak iz zadnjeg valjanog stanja
-- gubitak RTC SQW impulsa: kazaljke i ploca imaju `millis()` fallback za sigurno gasenje aktivne faze
+- gubitak RTC SQW impulsa: kazaljke i ploca odmah gase aktivnu fazu bez dodatnog pomaka kako releji ne bi ostali ukljuceni
 - gubitak `RTC/I2C` veze: aktivira se izlazni fail-safe i releji za zvona, cekice, kazaljke i plocu ostaju blokirani dok se `DS3231` ne oporavi
 - ponovljeni watchdog resetovi bez power-loss oznake: aktivira se `SUSTAV ZAKLJUCAN / PREVISE RESETA`
 - ponovljena nevaljana RTC ocitanja: aktivira se `RTC OGRANICEN RAD / CEKAM OPORAVAK` i automatika vremena se privremeno blokira

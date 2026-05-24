@@ -12,16 +12,21 @@ void ukljuciZvono(int zvono);
 
 // Iskljucivanje pojedinog zvona 1-2
 void iskljuciZvono(int zvono);
+void zahtijevajOperatorovoGasenjeZvona(int zvono);
 
 // Upiti o stanju zvona
 bool jeZvonoUTijeku();
 bool jeZvonoAktivno(int zvono);
+bool jeProduzeniZavrsetakZvonaBezKocniceAktivan();
 
 // Aktivacija/deaktivacija s trajanjem
 void aktivirajZvonjenje(int zvono);
 void aktivirajZvonjenjeNaTrajanje(int zvono, unsigned long trajanjeMs);
 void deaktivirajZvonjenje(int zvono);
 void iskljuciObaZvonaSinkronizirano();
+void izracunajTrajanjaDvajuZvonaZaSinkroniZavrsetak(unsigned long baznoTrajanjeMs,
+                                                    unsigned long& trajanjeZvona1Ms,
+                                                    unsigned long& trajanjeZvona2Ms);
 void postaviGlobalnuBlokaduZvona(bool blokiraj);
 void postaviBlokaduZvonaTihiRezim(bool blokiraj);
 void postaviBlokaduZvonaUPS(bool blokiraj);

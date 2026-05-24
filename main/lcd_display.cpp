@@ -117,7 +117,7 @@ static const char LCD_PORUKA_BELL1[] PROGMEM = "Zvono 1 radi   ";
 static const char LCD_PORUKA_BELL2[] PROGMEM = "Zvono 2 radi   ";
 static const char LCD_PORUKA_OBA_ZVONA[] PROGMEM = "Zvone oba zvona";
 static const char LCD_PORUKA_OTKUCAJ[] PROGMEM = "Otkucavanje...  ";
-static const char LCD_PORUKA_ERR_RTC[] PROGMEM = "ERR:RTC baterija";
+static const char LCD_PORUKA_ERR_RTC[] PROGMEM = "ERR: RTC VEZA  ";
 static const char LCD_PORUKA_ERR_EEPROM[] PROGMEM = "ERROR: EEPROM   ";
 static const char LCD_PORUKA_SLAVLJENJE[] PROGMEM = "SLAVLJENJE      ";
 static const char LCD_PORUKA_MRTVACKO[] PROGMEM = "MRTVA\x01KO ZVONO  ";
@@ -325,7 +325,7 @@ static bool trebaPrikazatiDugiHodSata(int& memoriraneMinute) {
     return false;
   }
 
-  const EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  const EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   memoriraneMinute = stanje.hand_position;
 
   const int ciljVrijeme = izracunajDvanaestSatneMinuteZaLCD(dohvatiTrenutnoVrijeme());
@@ -350,7 +350,7 @@ static void formatirajHodSata(int memoriraneMinute, char* odrediste, size_t veli
 }
 
 static bool jeSustavAktivanNaLCD() {
-  const EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliMigriraj();
+  const EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   return stanje.hand_active != 0 ||
          stanje.plate_phase != 0 ||
          jeZvonoUTijeku() ||
@@ -639,6 +639,15 @@ static void build_line2() {
 
   const bool zvono1Aktivno = jeZvonoAktivno(1);
   const bool zvono2Aktivno = jeZvonoAktivno(2);
+
+  if (jeProduzeniZavrsetakZvonaBezKocniceAktivan()) {
+    char poruka[17];
+    FlashTekst::kopirajLiteral(poruka, sizeof(poruka), LCD_PORUKA_INERCIJA);
+    pripremiDrugiRedakZaLCD(poruka);
+    otkucavanje_poruka_aktivna = false;
+    hod_sata_prikaz_aktivan = false;
+    return;
+  }
 
   // Prikaz zvona mora pratiti stvarno stanje releja toranjskog sata.
   if (current_activity == ACTIVITY_BELL1 || current_activity == ACTIVITY_BELL2 ||

@@ -55,7 +55,6 @@ Time se osigurava da nijedan podsustav ne gladuje, a svi rade ciklicki u malim k
 - `hand_position`: logicka pozicija kazaljki u rasponu `0-719`
 - `hand_active`: je li trenutno aktivan impuls kazaljki
 - `hand_relay`: koji relej vodi impuls kazaljki (`nijedan`, `PARNI`, `NEPARNI`)
-- `hand_start_ms`: lokalni `millis()` trenutak starta aktivne faze
 - `plate_position`: trenutna pozicija okretne ploce `0-63`
 - `plate_phase`: faza ploce (`stabilno`, `prvi relej`, `drugi relej`)
 
@@ -64,12 +63,16 @@ Sloj `UnifiedMotionStateStore` koristi dvije razine:
 - RAM cache za brzo citanje bez nepotrebnog `I2C` prometa
 - EEPROM za trajnost kroz nestanak napajanja
 
-Za testnu reviziju toranjskog sata `UnifiedMotionState` koristi **24 rotirajuca slota** u vlastitom EEPROM bloku. Pri citanju se skeniraju svi konfigurirani slotovi, a najnoviji zapis bira se po internoj sekvenci bez zajednickog meta-zapisa.
+Napomena:
+- aktualna revizija firmwarea za toranjski sat namjerno vise ne cita stare `UnifiedMotionState`, stare periodicke recovery backup zapise ili starije verzije korisnickih EEPROM postavki
+- nakon nadogradnje na ovu reviziju postavke, recovery backup i pomocni spremnici tretiraju se kao novi i po potrebi se ponovno upisuju kroz izbornik ili web
+
+Aktualna revizija toranjskog sata `UnifiedMotionState` koristi **48 rotirajucih slotova** u vlastitom EEPROM bloku. Pri citanju se skeniraju svi konfigurirani slotovi, a najnoviji zapis bira se po internoj sekvenci bez zajednickog meta-zapisa.
 
 Tok rada:
 1. kod citanja prvo pokusava cache
 2. ako cache nije inicijaliziran, cita iz EEPROM-a
-3. ako EEPROM nije valjan, radi migraciju ili rekonstrukciju inicijalnog stanja i odmah ga zapisuje
+3. ako EEPROM nije valjan, rekonstruira inicijalno stanje za ovu reviziju i odmah ga zapisuje
 
 ### Kada se stanje sprema
 Stanje se sprema samo kad postoji promjena:
@@ -96,7 +99,7 @@ Relej se bira prema paritetu trenutne logicke pozicije:
 - neparna pozicija -> `NEPARNI` relej
 
 ### Zavrsavanje aktivne faze
-Primarni autoritet za ritam i dalje je `RTC SQW`, ali završetak aktivne faze ima i `millis()` fallback. Time relej ne moze ostati trajno ukljucen ako `RTC SQW` privremeno nestane.
+Primarni autoritet za ritam i zavrsetak aktivne faze je `RTC SQW`. Ako `RTC SQW` privremeno nestane, toranjski sat odmah gasi relej bez dodatnog pomaka kako aktivna faza ne bi ostala zaglavljena.
 
 ### Kako se ispravlja mismatch prema RTC-u
 Cilj je uvijek `RTC vrijeme -> (sat % 12) * 60 + minuta`.
@@ -248,15 +251,28 @@ Meni `Sustav` sada ima i stavku `K:0/1`:
 - `K=1` znaci da se koristi kocnica i ponasanje ostaje jednako kao u starijim verzijama firmwarea
 - `K=0` znaci da se radi bez kocnice i tada firmware svjesno razdvaja gasenje dvaju zvona
 
-Kad `K=0` i oba zvona pokrece okretna ploca:
-- `Zvono 1` gasi se `30 s` prije `Zvona 2`
-- `Zvono 2` zadrzava puni raspored trajanja za taj termin
+Za sinkroni zavrsetak bez kocnice firmware koristi stvarne postavke `INR1` i `INR2` iz [main/postavke.cpp](../main/postavke.cpp) te zajednicki prag rada od `20 s`:
+- ako su oba zvona radila krace od `20 s`, gasenje ostaje neposredno jer se zvona mozda jos nisu dovoljno zanjihala za punu inerciju
+- ako su oba zvona radila barem `20 s`, relej se ranije gasi onom zvonu koje ima dulju inerciju kako bi mehanicki zavrsetak oba zvona bio sto blize sinkronom kraju
+
+Kad `K=0` i oba zvona pokrece okretna ploca ili druga vremenski ogranicena automatika:
+- baza ostaje isto zadano trajanje termina
+- trajanje se skracuje samo zvonu s duljom inercijom, i to za razliku `abs(INR1 - INR2)`
+- pritom se cuva minimalni rad od `20 s`, tako da kratki ili granicni termini ne dobiju nerealno kratak impuls
 
 Kad `K=0` i vanjski API posalje zajednicku naredbu `GASI_SVE` dok oba zvona rade:
-- `Zvono 1` gasi se odmah
-- `Zvono 2` smije ostati jos `30 s`
+- ako su oba zvona radila barem `20 s`, odmah se gasi zvono s duljom inercijom
+- drugo zvono smije ostati ukljuceno jos za razliku inercija kako bi mehanicki stala zajedno
+- ako prag `20 s` nije dosegnut, oba zvona gase se odmah bez dodatnog produzenja
 
-Pojedinacne naredbe `ZVONO1_OFF` i `ZVONO2_OFF` i dalje ostaju neposredne.
+Kad `K=0` i operator gasi zvona pojedinacnim `OFF` toggleom, fizickom sklopkom ili `433 MHz` tipkama:
+- prvi `OFF` ne mora znaciti trenutan pad releja ako su oba zvona aktivna i vec su radila barem `20 s`
+- firmware tada ceka do `2 s` na drugo `OFF`, kako bi nadoknadio realan ljudski razmak izmedu dvaju prekidaca
+- u tom kratkom cekanju lampica prvog trazenog zvona treperi istim ritmom kao i kod inercije, iako relej jos nije stvarno ugasen
+- ako drugo `OFF` stigne u tom prozoru, oba zahtjeva se tretiraju kao zajednicko gasenje i primjenjuje se ista matematika razlike inercija
+- ako drugo `OFF` ne stigne na vrijeme, prvo trazeno zvono gasi se normalno pojedinacno
+
+Web/API pojedinacne naredbe `ZVONO1_OFF` i `ZVONO2_OFF` ostaju neposredne, a za zajednicko koordinirano gasenje i dalje sluzi `GASI_SVE`.
 
 ### Tihi rezim i zvona
 Kad je aktivan tihi rezim:

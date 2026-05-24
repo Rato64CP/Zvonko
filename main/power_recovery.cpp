@@ -34,7 +34,6 @@ constexpr uint8_t HAND_RELEJ_NIJEDAN = 0;
 constexpr uint8_t PLATE_FAZA_STABILNO = 0;
 constexpr uint8_t BROJ_POZICIJA_PLOCE = 64;
 constexpr uint16_t BROJ_MINUTA_CIKLUS = 720;
-constexpr uint32_t LEGACY_MIN_UNIX_TIMESTAMP = 1000000000UL;
 constexpr uint32_t EEPROM_DIJAGNOSTICKI_POTPIS = 0x12345678UL;
 constexpr int BAZA_LATCHED_FAULT = EepromLayout::BAZA_LATCHED_FAULT;
 constexpr uint16_t LATCHED_FAULT_POTPIS = EepromLayout::LATCHED_FAULT_POTPIS;
@@ -72,20 +71,13 @@ static uint16_t izracunajChecksum(const SystemStateBackup& stanje) {
   checksum += stanje.hand_position_k_minuta & 0xFFFF;
   checksum += (stanje.plate_position >> 16) & 0xFFFF;
   checksum += stanje.plate_position & 0xFFFF;
-  checksum += (stanje.rtc_timestamp >> 16) & 0xFFFF;
-  checksum += stanje.rtc_timestamp & 0xFFFF;
+  checksum += (stanje.sekvenca_zapisa >> 16) & 0xFFFF;
+  checksum += stanje.sekvenca_zapisa & 0xFFFF;
   return checksum;
 }
 
 static bool jeStanjeValidno(const SystemStateBackup& stanje) {
   return stanje.checksum == izracunajChecksum(stanje);
-}
-
-static bool jeLegacyBackupPoVremenu(const SystemStateBackup& stanje) {
-  // Legacy backupi toranjskog sata koristili su RTC unix timestamp.
-  // Novi recovery zapis koristi monotonu sekvencu, ali stari format
-  // jos moramo razlikovati dok god postoji sansa da je ostao u EEPROM-u.
-  return stanje.rtc_timestamp >= PowerRecoveryLayout::LEGACY_MIN_UNIX_TIMESTAMP;
 }
 
 static uint16_t izracunajChecksumWatchdogSafeMode(const WatchdogSafeModeState& stanje) {
@@ -307,7 +299,6 @@ static void obradiWatchdogSafeModePriBootu() {
 
 bool ucitajNajnovijiBackup(SystemStateBackup& backup, int* slotNajnoviji = nullptr) {
   bool pronadeno = false;
-  bool pronadenSekvencijskiBackup = false;
   uint32_t najboljaVrijednost = 0;
   int najboljiSlot = -1;
 
@@ -318,21 +309,9 @@ bool ucitajNajnovijiBackup(SystemStateBackup& backup, int* slotNajnoviji = nullp
       continue;
     }
 
-    const bool kandidatJeLegacy = jeLegacyBackupPoVremenu(kandidat);
-    if (kandidatJeLegacy && pronadenSekvencijskiBackup) {
-      continue;
-    }
-
-    if (!kandidatJeLegacy && !pronadenSekvencijskiBackup) {
-      pronadenSekvencijskiBackup = true;
-      pronadeno = false;
-      najboljaVrijednost = 0;
-      najboljiSlot = -1;
-    }
-
-    if (!pronadeno || kandidat.rtc_timestamp >= najboljaVrijednost) {
+    if (!pronadeno || kandidat.sekvenca_zapisa >= najboljaVrijednost) {
       backup = kandidat;
-      najboljaVrijednost = kandidat.rtc_timestamp;
+      najboljaVrijednost = kandidat.sekvenca_zapisa;
       najboljiSlot = slot;
       pronadeno = true;
     }
@@ -363,10 +342,9 @@ void odradiBootRecovery() {
   const bool stanjeUcitano = ucitajNajnovijiBackup(backup, &ucitaniSlot);
   if (stanjeUcitano) {
     char log[80];
-    snprintf_P(log, sizeof(log), PSTR("Power Recovery: Valid state loaded from slot %d %s%lu"),
+    snprintf_P(log, sizeof(log), PSTR("Power Recovery: Valid state loaded from slot %d sekv=%lu"),
                ucitaniSlot,
-               jeLegacyBackupPoVremenu(backup) ? "ts=" : "seq=",
-               backup.rtc_timestamp);
+               backup.sekvenca_zapisa);
     posaljiPCLog(log);
   }
 
@@ -380,7 +358,6 @@ void odradiBootRecovery() {
     if (jedinstvenoStanje.hand_active != PowerRecoveryLayout::HAND_NEAKTIVNO) {
       jedinstvenoStanje.hand_active = PowerRecoveryLayout::HAND_NEAKTIVNO;
       jedinstvenoStanje.hand_relay = PowerRecoveryLayout::HAND_RELEJ_NIJEDAN;
-      jedinstvenoStanje.hand_start_ms = 0;
       UnifiedMotionStateStore::spremiAkoPromjena(jedinstvenoStanje);
       posaljiPCLog(F("Power Recovery: Prekinuti impuls kazaljki vracen u mirno stanje iz iste pozicije"));
     }
@@ -416,8 +393,8 @@ void spremiKriticalnoStanje() {
     int zadnjiSlot = -1;
     if (ucitajNajnovijiBackup(zadnjiBackup, &zadnjiSlot) && zadnjiSlot >= 0) {
       save_slot = static_cast<uint8_t>((zadnjiSlot + 1) % PowerRecoveryLayout::SLOTOVI_BOOT_FLAGS);
-      if (!jeLegacyBackupPoVremenu(zadnjiBackup) && zadnjiBackup.rtc_timestamp > 0UL) {
-        save_sequence = zadnjiBackup.rtc_timestamp + 1UL;
+      if (zadnjiBackup.sekvenca_zapisa > 0UL) {
+        save_sequence = zadnjiBackup.sekvenca_zapisa + 1UL;
       }
     }
     inicijaliziranSaveSlot = true;
@@ -450,9 +427,9 @@ void spremiKriticalnoStanje() {
   SystemStateBackup backup;
   backup.hand_position_k_minuta = static_cast<uint32_t>(dohvatiMemoriraneKazaljkeMinuta());
   backup.plate_position = static_cast<uint32_t>(dohvatiPozicijuPloce());
-  // Novi backup koristi monotono rastucu sekvencu kako recovery toranjskog sata
-  // ne bi ovisio o tome je li RTC/NTP vrijeme naknadno vraceno unatrag.
-  backup.rtc_timestamp = save_sequence;
+  // Periodicki recovery backup koristi monotonu sekvencu kako oporavak
+  // toranjskog sata ne bi ovisio o tome je li RTC/NTP vrijeme naknadno vraceno unatrag.
+  backup.sekvenca_zapisa = save_sequence;
   backup.checksum = izracunajChecksum(backup);
 
   const int adresa = PowerRecoveryLayout::BAZA_BOOT_FLAGS + save_slot * static_cast<int>(sizeof(SystemStateBackup));
