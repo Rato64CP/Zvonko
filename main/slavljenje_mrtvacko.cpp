@@ -55,8 +55,11 @@ struct SlavljenjeStanje {
   int trenutniKorak;
   uint8_t aktivniMod;
   unsigned long vrijemeKorakaMs;
+  unsigned long vrijemeAktivacijeUs;
+  uint32_t generacijaPokretanja;
   bool cekicAktivan;
   int aktivniPin;
+  bool prviUdaracNaCekanju;
   bool termalnaPauzaAktivna;
   bool termalnaZastitaAktivirana;
   unsigned long vrijemePocetkaTermalnePauzeMs;
@@ -68,22 +71,26 @@ struct MrtvackoStanje {
   unsigned long vrijemePocetkaMs;
   bool cekiciAktivni;
   unsigned long vrijemeFazeMs;
+  unsigned long vrijemeAktivacijeUs;
+  uint32_t generacijaPokretanja;
   uint8_t aktivniMod;
   uint8_t faza;
+  bool prviUdaracNaCekanju;
   bool autoStopUkljucen;
   unsigned long autoStopNakonMs;
   uint8_t zadanoTrajanjeMin;
   bool ignorirajThumbwheel;
 };
 
-SlavljenjeStanje slavljenje = {false, 0UL, 0, 1, 0UL, false, -1, false, false, 0UL, 0UL};
+SlavljenjeStanje slavljenje = {false, 0UL, 0, 1, 0UL, 0UL, 0UL, false, -1, false, false, false, 0UL, 0UL};
 MrtvackoStanje mrtvacko = {
-    false, 0UL, false, 0UL, MOD_MRTVACKO_KLASICNO, MRTVACKO_FAZA_OBA_CEKICA, false, 0UL, 0, false};
+    false, 0UL, false, 0UL, 0UL, 0UL, MOD_MRTVACKO_KLASICNO, MRTVACKO_FAZA_OBA_CEKICA, false, false, 0UL, 0, false};
 bool slavljenjeNaCekanju = false;
 bool mrtvackoNaCekanju = false;
 bool prekidacSlavljenjaAktivan = false;
 bool prekidacSlavljenjaPrisilnoIskljucen = false;
 unsigned long prekidacSlavljenjaVrijemeAktivacijeMs = 0UL;
+uint32_t brojGlavnihPetljiPosebnihNacina = 0;
 
 bool jeBlokadaUPSModaAktivna() {
   return jeUPSModAktivan();
@@ -220,6 +227,7 @@ void uskladiStanjeNakonSigurnosnogLimita(unsigned long sadaMs) {
       !jeCekicSigurnosnoAktivanZaPosebniNacin(slavljenje.aktivniPin)) {
     slavljenje.cekicAktivan = false;
     slavljenje.aktivniPin = -1;
+    slavljenje.vrijemeAktivacijeUs = 0UL;
     slavljenje.vrijemeKorakaMs = sadaMs;
   }
 
@@ -227,6 +235,7 @@ void uskladiStanjeNakonSigurnosnogLimita(unsigned long sadaMs) {
       !jeCekicSigurnosnoAktivanZaPosebniNacin(PIN_CEKIC_MUSKI) &&
       !jeCekicSigurnosnoAktivanZaPosebniNacin(PIN_CEKIC_ZENSKI)) {
     mrtvacko.cekiciAktivni = false;
+    mrtvacko.vrijemeAktivacijeUs = 0UL;
     mrtvacko.vrijemeFazeMs = sadaMs;
     if (mrtvacko.aktivniMod == MOD_MRTVACKO_SEKVENCIJALNO &&
         mrtvacko.faza == MRTVACKO_FAZA_CEKIC1) {
@@ -241,6 +250,8 @@ void azurirajSlavljenje(unsigned long sadaMs) {
   if (!slavljenje.aktivno) {
     return;
   }
+
+  const unsigned long sadaUs = micros();
 
   if (slavljenje.termalnaPauzaAktivna) {
     if ((sadaMs - slavljenje.vrijemePocetkaTermalnePauzeMs) <
@@ -272,11 +283,31 @@ void azurirajSlavljenje(unsigned long sadaMs) {
   const unsigned long trajanjeImpulsa =
       dohvatiTrajanjeImpulsaSlavljenjaZaMod(slavljenje.aktivniMod);
 
+  if (slavljenje.prviUdaracNaCekanju) {
+    // Prvi udarac mora cekati barem sljedeci glavni prolaz loop() petlje.
+    // Time pokretanje posebnog nacina i prvi stvarni impuls vise ne dijele
+    // isti ciklus obrade, pa prvi udar vise ne ispada dulji od ostalih.
+    if (slavljenje.generacijaPokretanja == brojGlavnihPetljiPosebnihNacina) {
+      return;
+    }
+    const int prviPin = dohvatiPinSlavljenjaZaKorak(slavljenje.aktivniMod, 0);
+    aktivirajJedanCekicZaPosebniNacin(prviPin, trajanjeImpulsa);
+    slavljenje.trenutniKorak = 0;
+    slavljenje.aktivniPin = prviPin;
+    slavljenje.cekicAktivan = true;
+    slavljenje.vrijemeAktivacijeUs = sadaUs;
+    slavljenje.vrijemeKorakaMs = sadaMs;
+    slavljenje.prviUdaracNaCekanju = false;
+    return;
+  }
+
   if (slavljenje.cekicAktivan) {
-    if (proteklo >= trajanjeImpulsa) {
+    const unsigned long protekloUs = sadaUs - slavljenje.vrijemeAktivacijeUs;
+    if (protekloUs >= (trajanjeImpulsa * 1000UL)) {
       deaktivirajObaCekicaZaPosebniNacin();
       slavljenje.cekicAktivan = false;
       slavljenje.aktivniPin = -1;
+      slavljenje.vrijemeAktivacijeUs = 0UL;
       slavljenje.vrijemeKorakaMs = sadaMs;
     }
     return;
@@ -290,6 +321,7 @@ void azurirajSlavljenje(unsigned long sadaMs) {
     aktivirajJedanCekicZaPosebniNacin(sljedeciPin, trajanjeImpulsa);
     slavljenje.aktivniPin = sljedeciPin;
     slavljenje.cekicAktivan = true;
+    slavljenje.vrijemeAktivacijeUs = sadaUs;
     slavljenje.vrijemeKorakaMs = sadaMs;
   }
 }
@@ -298,6 +330,8 @@ void azurirajMrtvacko(unsigned long sadaMs) {
   if (!mrtvacko.aktivno) {
     return;
   }
+
+  const unsigned long sadaUs = micros();
 
   // Ako se timer na thumbwheelu promijeni tijekom rucnog rada, nova vrijednost
   // odmah postaje autoritet. Automatsko mrtvacko za Svi sveti ga namjerno ignorira.
@@ -320,10 +354,33 @@ void azurirajMrtvacko(unsigned long sadaMs) {
   const unsigned long trajanjeImpulsa =
       dohvatiTrajanjeImpulsaMrtvackogZaFazu(mrtvacko.aktivniMod, mrtvacko.faza);
 
+  if (mrtvacko.prviUdaracNaCekanju) {
+    // I mrtvacko mora pricekati sljedecu glavnu iteraciju loop() petlje
+    // prije prvog udara, kako start i prvi impuls ne bi zavrsili u istom
+    // ciklusu obrade toranjskog sata.
+    if (mrtvacko.generacijaPokretanja == brojGlavnihPetljiPosebnihNacina) {
+      return;
+    }
+    if (mrtvacko.aktivniMod == MOD_MRTVACKO_SEKVENCIJALNO) {
+      aktivirajJedanCekicZaPosebniNacin(PIN_CEKIC_MUSKI, MRTVACKO_MOD2_TRAJANJE_IMPULSA_MS);
+      mrtvacko.faza = MRTVACKO_FAZA_CEKIC1;
+    } else {
+      aktivirajObaCekicaZaPosebniNacin(dohvatiTrajanjeImpulsaCekicaZaPosebneNacineMs());
+      mrtvacko.faza = MRTVACKO_FAZA_OBA_CEKICA;
+    }
+    mrtvacko.cekiciAktivni = true;
+    mrtvacko.vrijemeAktivacijeUs = sadaUs;
+    mrtvacko.vrijemeFazeMs = sadaMs;
+    mrtvacko.prviUdaracNaCekanju = false;
+    return;
+  }
+
   if (mrtvacko.cekiciAktivni) {
-    if (proteklo >= trajanjeImpulsa) {
+    const unsigned long protekloUs = sadaUs - mrtvacko.vrijemeAktivacijeUs;
+    if (protekloUs >= (trajanjeImpulsa * 1000UL)) {
       deaktivirajObaCekicaZaPosebniNacin();
       mrtvacko.cekiciAktivni = false;
+      mrtvacko.vrijemeAktivacijeUs = 0UL;
       if (mrtvacko.aktivniMod == MOD_MRTVACKO_SEKVENCIJALNO &&
           mrtvacko.faza == MRTVACKO_FAZA_CEKIC1) {
         mrtvacko.vrijemeFazeMs = sadaMs;
@@ -348,6 +405,7 @@ void azurirajMrtvacko(unsigned long sadaMs) {
       aktivirajJedanCekicZaPosebniNacin(PIN_CEKIC_ZENSKI, MRTVACKO_MOD2_TRAJANJE_IMPULSA_MS);
       mrtvacko.cekiciAktivni = true;
       mrtvacko.faza = MRTVACKO_FAZA_CEKIC2;
+      mrtvacko.vrijemeAktivacijeUs = sadaUs;
       mrtvacko.vrijemeFazeMs = sadaMs;
     }
     return;
@@ -362,6 +420,7 @@ void azurirajMrtvacko(unsigned long sadaMs) {
       mrtvacko.faza = MRTVACKO_FAZA_OBA_CEKICA;
     }
     mrtvacko.cekiciAktivni = true;
+    mrtvacko.vrijemeAktivacijeUs = sadaUs;
     mrtvacko.vrijemeFazeMs = sadaMs;
   }
 }
@@ -517,15 +576,16 @@ bool pokreniSlavljenjeInterno(bool postaviCekanjeAkoBlokirano) {
   slavljenje.trenutniKorak = 0;
   slavljenje.aktivniMod = modSlavljenja;
   slavljenje.vrijemeKorakaMs = sadaMs;
-  slavljenje.cekicAktivan = true;
-  slavljenje.aktivniPin = dohvatiPinSlavljenjaZaKorak(modSlavljenja, 0);
+  slavljenje.vrijemeAktivacijeUs = 0UL;
+  slavljenje.generacijaPokretanja = brojGlavnihPetljiPosebnihNacina;
+  slavljenje.cekicAktivan = false;
+  slavljenje.aktivniPin = -1;
+  slavljenje.prviUdaracNaCekanju = true;
   slavljenje.termalnaPauzaAktivna = false;
   slavljenje.termalnaZastitaAktivirana = false;
   slavljenje.vrijemePocetkaTermalnePauzeMs = 0UL;
   slavljenje.sljedecaTermalnaPauzaMs =
       sadaMs + SLAVLJENJE_TERMALNA_ZASTITA_POCETAK_MS;
-  aktivirajJedanCekicZaPosebniNacin(
-      slavljenje.aktivniPin, dohvatiTrajanjeImpulsaSlavljenjaZaMod(modSlavljenja));
   digitalWrite(PIN_LAMPICA_SLAVLJENJE, HIGH);
 
   posaljiLogStartaSlavljenja(modSlavljenja);
@@ -572,9 +632,12 @@ bool pokreniMrtvackoInterno(bool koristiThumbwheel,
 
   mrtvacko.aktivno = true;
   mrtvacko.vrijemePocetkaMs = sadaMs;
-  mrtvacko.cekiciAktivni = true;
+  mrtvacko.cekiciAktivni = false;
   mrtvacko.vrijemeFazeMs = sadaMs;
+  mrtvacko.vrijemeAktivacijeUs = 0UL;
+  mrtvacko.generacijaPokretanja = brojGlavnihPetljiPosebnihNacina;
   mrtvacko.aktivniMod = modMrtvackog;
+  mrtvacko.prviUdaracNaCekanju = true;
   mrtvacko.ignorirajThumbwheel = !koristiThumbwheel;
   digitalWrite(PIN_LAMPICA_MRTVACKO, HIGH);
   if (koristiThumbwheel) {
@@ -592,10 +655,8 @@ bool pokreniMrtvackoInterno(bool koristiThumbwheel,
 
   if (modMrtvackog == MOD_MRTVACKO_SEKVENCIJALNO) {
     mrtvacko.faza = MRTVACKO_FAZA_CEKIC1;
-    aktivirajJedanCekicZaPosebniNacin(PIN_CEKIC_MUSKI, MRTVACKO_MOD2_TRAJANJE_IMPULSA_MS);
   } else {
     mrtvacko.faza = MRTVACKO_FAZA_OBA_CEKICA;
-    aktivirajObaCekicaZaPosebniNacin(dohvatiTrajanjeImpulsaCekicaZaPosebneNacineMs());
   }
 
   posaljiLogStartaMrtvackog(modMrtvackog,
@@ -621,8 +682,11 @@ void inicijalizirajSlavljenjeIMrtvacko() {
   slavljenje.trenutniKorak = 0;
   slavljenje.aktivniMod = 1;
   slavljenje.vrijemeKorakaMs = 0UL;
+  slavljenje.vrijemeAktivacijeUs = 0UL;
+  slavljenje.generacijaPokretanja = 0UL;
   slavljenje.cekicAktivan = false;
   slavljenje.aktivniPin = -1;
+  slavljenje.prviUdaracNaCekanju = false;
   slavljenje.termalnaPauzaAktivna = false;
   slavljenje.termalnaZastitaAktivirana = false;
   slavljenje.vrijemePocetkaTermalnePauzeMs = 0UL;
@@ -632,8 +696,11 @@ void inicijalizirajSlavljenjeIMrtvacko() {
   mrtvacko.vrijemePocetkaMs = 0UL;
   mrtvacko.cekiciAktivni = false;
   mrtvacko.vrijemeFazeMs = 0UL;
+  mrtvacko.vrijemeAktivacijeUs = 0UL;
+  mrtvacko.generacijaPokretanja = 0UL;
   mrtvacko.aktivniMod = MOD_MRTVACKO_KLASICNO;
   mrtvacko.faza = MRTVACKO_FAZA_OBA_CEKICA;
+  mrtvacko.prviUdaracNaCekanju = false;
   mrtvacko.autoStopUkljucen = false;
   mrtvacko.autoStopNakonMs = 0UL;
   mrtvacko.zadanoTrajanjeMin = 0;
@@ -643,6 +710,10 @@ void inicijalizirajSlavljenjeIMrtvacko() {
   prekidacSlavljenjaAktivan = false;
   prekidacSlavljenjaPrisilnoIskljucen = false;
   prekidacSlavljenjaVrijemeAktivacijeMs = 0UL;
+}
+
+void oznaciNovuGlavnuPetljuPosebnihNacina() {
+  ++brojGlavnihPetljiPosebnihNacina;
 }
 
 void upravljajSlavljenjemIMrtvackim(unsigned long sadaMs) {
@@ -674,6 +745,8 @@ void zaustaviSlavljenje() {
   deaktivirajObaCekicaZaPosebniNacin();
   slavljenje.cekicAktivan = false;
   slavljenje.aktivniPin = -1;
+  slavljenje.vrijemeAktivacijeUs = 0UL;
+  slavljenje.prviUdaracNaCekanju = false;
   slavljenje.termalnaPauzaAktivna = false;
   slavljenje.termalnaZastitaAktivirana = false;
   slavljenje.vrijemePocetkaTermalnePauzeMs = 0UL;
@@ -711,8 +784,10 @@ void zaustaviMrtvacko() {
   mrtvacko.aktivno = false;
   deaktivirajObaCekicaZaPosebniNacin();
   mrtvacko.cekiciAktivni = false;
+  mrtvacko.vrijemeAktivacijeUs = 0UL;
   mrtvacko.aktivniMod = MOD_MRTVACKO_KLASICNO;
   mrtvacko.faza = MRTVACKO_FAZA_OBA_CEKICA;
+  mrtvacko.prviUdaracNaCekanju = false;
   mrtvacko.autoStopUkljucen = false;
   mrtvacko.autoStopNakonMs = 0UL;
   mrtvacko.zadanoTrajanjeMin = 0;

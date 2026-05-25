@@ -186,9 +186,9 @@ Time se izbjegava agresivno premotavanje ploce.
 ### Tajming
 Za redovno otkucavanje sekvenca koristi:
 - impuls cekica iz postavki, ogranicen sigurnosnim limitom
-- definirane pauze izmedu udaraca
+- `RTC SQW` raspored udara svake druge sekunde (`0, 2, 4, 6...`) dok sekvenca traje
 
-Start pune i polovine ure sada se, kad je `RTC SQW` dostupan, poravnava na stvarnu granicu sekunde. Ako `SQW` privremeno nije dostupan, ostaje fallback na dosadasnje minutno okidanje kako toranjski sat ne bi izgubio funkciju.
+Start pune i polovine ure poravnava se na stvarnu granicu sekunde preko `RTC SQW`, a i svi sljedeci udarci unutar sekvence idu po `SQW` rasporedu. Ako `SQW` privremeno nije dostupan, redovno otkucavanje se ne izvodi.
 
 ### Posebni nacini rada cekica
 - `slavljenje 1`, `mrtvacko 1` i redovno otkucavanje i dalje koriste zajednicki impuls iz postavki

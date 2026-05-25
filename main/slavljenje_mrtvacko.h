@@ -4,6 +4,10 @@
 // Inicijalizira lokalne tipke i pocetno stanje slavljenja i mrtvackog.
 void inicijalizirajSlavljenjeIMrtvacko();
 
+// Oznacava novu glavnu iteraciju loop() kako bi posebni nacini mogli
+// razdvojiti pokretanje od prvog stvarnog udara cekica.
+void oznaciNovuGlavnuPetljuPosebnihNacina();
+
 // Obraduje tipke i automat stanja posebnih nacina rada cekica.
 void upravljajSlavljenjemIMrtvackim(unsigned long sadaMs);
 

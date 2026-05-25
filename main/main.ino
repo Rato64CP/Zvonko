@@ -13,6 +13,7 @@
 #include "debouncing.h"
 #include "zvonjenje.h"
 #include "otkucavanje.h"
+#include "slavljenje_mrtvacko.h"
 #include "menu_system.h"
 #include "kazaljke_sata.h"
 #include "okretna_ploca.h"
@@ -103,6 +104,7 @@ void setup() {
 }
 
 void loop() {
+  oznaciNovuGlavnuPetljuPosebnihNacina();
   osvjeziWatchdog();
   osvjeziSigurnosniLimitCekica();
 
@@ -130,18 +132,29 @@ void loop() {
   postaviGlobalnuBlokaduOtkucavanja(jeRtcIzlazniFailSafeAktivan());
   postaviBlokaduOtkucavanja(!jeVrijemePotvrdjenoZaAutomatiku());
   obradiDaljinski433();
+  osvjeziSigurnosniLimitCekica();
 
   upravljajZvonom();
   upravljajOtkucavanjem();
+  // Cekici toranjskog sata ne smiju cekati cijeli novi krug loop() da bi
+  // sigurnosni limit odrezao impuls. Nakon obrade mehanike osvjezavamo cutoff
+  // i usput smanjujemo jitter prvog udara slavljenja/mrtvackog.
+  osvjeziSigurnosniLimitCekica();
   upravljajSuncevomAutomatikom();
+  osvjeziSigurnosniLimitCekica();
   upravljajMiseAutomatikom();
+  osvjeziSigurnosniLimitCekica();
   upravljajPogrebnimSkriptama(millis());
+  osvjeziSigurnosniLimitCekica();
   osvjeziMrtvackoThumbwheel();
   upravljajKorekcijomKazaljki();
+  osvjeziSigurnosniLimitCekica();
   upravljajPlocom();
+  osvjeziSigurnosniLimitCekica();
   osvjeziStatusPushPremaESP();
   obradiAutomatskiNTPZahtjevESP();
   spremiKriticalnoStanje();
+  osvjeziSigurnosniLimitCekica();
   osvjeziPowerRecoveryDijagnostiku();
 
   osvjeziWatchdog();

@@ -17,6 +17,8 @@ const unsigned long DALJINSKI_433_MIN_TRAJANJE_IMPULSA_US = 80UL;
 const unsigned long DALJINSKI_433_GAP_OKVIRA_US = 5000UL;
 const unsigned long DALJINSKI_433_MAKS_RAZMAK_PONAVLJANJA_SLAVLJENJE_MS = 350UL;
 const unsigned long DALJINSKI_433_MAKS_RAZMAK_PONAVLJANJA_ZVONO_I_MRTVACKO_MS = 500UL;
+const unsigned long DALJINSKI_433_PROZOR_MIRA_NAKON_PRIHVATA_MS = 200UL;
+const unsigned long DALJINSKI_433_MIN_RAZMAK_LOGA_DEKODIRANJA_MS = 1000UL;
 const uint8_t DALJINSKI_433_EV1527_BROJ_BITOVA = 24;
 const uint8_t DALJINSKI_433_MAKS_IMPULSA = 80;
 const uint8_t DALJINSKI_433_MIN_IMPULSA_ZA_OKVIR = 20;
@@ -32,6 +34,8 @@ volatile bool okvirSpremanZaObradu = false;
 bool daljinski433Inicijaliziran = false;
 uint32_t zadnjiPrihvaceniKod = 0UL;
 unsigned long zadnjePrihvacanjeKodaMs = 0UL;
+unsigned long ignorirajOkvireDoMs = 0UL;
+unsigned long zadnjiLogNeuspjelogDekodiranjaMs = 0UL;
 
 void prekidDaljinskog433() {
   const unsigned long sadaUs = micros();
@@ -182,6 +186,7 @@ void obradiKodDaljinskog(uint32_t kod) {
 
   zadnjiPrihvaceniKod = kod;
   zadnjePrihvacanjeKodaMs = sadaMs;
+  ignorirajOkvireDoMs = sadaMs + DALJINSKI_433_PROZOR_MIRA_NAKON_PRIHVATA_MS;
 
   if (kod == DALJINSKI_433_KOD_TIPKE_A) {
     if (jeZvonoAktivno(1)) {
@@ -238,6 +243,8 @@ void inicijalizirajDaljinski433() {
   okvirSpremanZaObradu = false;
   zadnjiPrihvaceniKod = 0UL;
   zadnjePrihvacanjeKodaMs = 0UL;
+  ignorirajOkvireDoMs = 0UL;
+  zadnjiLogNeuspjelogDekodiranjaMs = 0UL;
 
   attachInterrupt(digitalPinToInterrupt(PIN_DALJINSKI_433_DATA), prekidDaljinskog433, CHANGE);
 
@@ -272,11 +279,22 @@ void obradiDaljinski433() {
   okvirSpremanZaObradu = false;
   interrupts();
 
+  const unsigned long sadaMs = millis();
+  if (static_cast<long>(sadaMs - ignorirajOkvireDoMs) < 0) {
+    return;
+  }
+
   uint32_t kod = 0UL;
   if (dekodirajEv1527Okvir(lokalniImpulsi, lokalniBrojImpulsa, &kod)) {
     obradiKodDaljinskog(kod);
     return;
   }
+
+  if ((sadaMs - zadnjiLogNeuspjelogDekodiranjaMs) <
+      DALJINSKI_433_MIN_RAZMAK_LOGA_DEKODIRANJA_MS) {
+    return;
+  }
+  zadnjiLogNeuspjelogDekodiranjaMs = sadaMs;
 
   char log[72];
   snprintf_P(log,

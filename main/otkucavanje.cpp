@@ -22,7 +22,6 @@
 namespace {
 
 const unsigned long TRAJANJE_IMPULSA_CEKICA_DEFAULT = 150UL;
-const unsigned long PAUZA_MEZI_UDARACA_DEFAULT = 400UL;
 const unsigned long SATNO_OTKUCAJ_PAUZA_MS = 2000UL;  // 2 s izmedu satnih udaraca
 const unsigned long SIGURNOSNI_MAX_TRAJANJE_CEKICA_MS = 150UL;
 const unsigned long SIGURNOSNI_MAX_OVERRIDE_TRAJANJE_CEKICA_MS = 300UL;
@@ -42,13 +41,11 @@ enum ModOtkucavanja {
 struct OtkucavanjeStanje {
   VrstaOtkucavanja vrsta;
   int preostaliUdarci;
-  unsigned long vrijemePocetkaMs;
   bool cekicAktivan;
   int aktivniPin;
   unsigned long vrijemeAktivacijeUs;
-  unsigned long vrijemeZadnjePromjeneMs;
   unsigned long trajanjeImpulsaMs;
-  unsigned long pauzaIzmeduUdaracaMs;
+  uint32_t sljedeciUdaracRtcTick;
 };
 
 struct SigurnostCekicaStanje {
@@ -60,13 +57,11 @@ struct SigurnostCekicaStanje {
 OtkucavanjeStanje otkucavanje = {
     OTKUCAVANJE_NONE,
     0,
-    0UL,
     false,
     -1,
     0UL,
-    0UL,
     TRAJANJE_IMPULSA_CEKICA_DEFAULT,
-    PAUZA_MEZI_UDARACA_DEFAULT};
+    0UL};
 bool blokadaOtkucavanja = false;
 bool globalnaBlokadaOtkucavanja = false;
 bool blokadaOtkucavanjaTihiRezim = false;
@@ -84,21 +79,27 @@ bool trebaObraditiNoviTerminOtkucavanja(const DateTime& sada) {
   static uint32_t zadnjiObradeniRtcTick = 0xFFFFFFFFUL;
   static uint32_t zadnjiObradeniKljucMinute = 0xFFFFFFFFUL;
 
-  const uint32_t kljucMinute = static_cast<uint32_t>(sada.unixtime() / 60UL);
-  if (jeRtcSqwAktivan()) {
-    const uint32_t rtcTick = dohvatiRtcSekundniBrojac();
-    if (rtcTick == zadnjiObradeniRtcTick) {
-      return false;
-    }
-    zadnjiObradeniRtcTick = rtcTick;
-
-    // Dok je RTC SQW dostupan, otkucavanje treba krenuti tocno na
-    // granici nove minute, a ne proizvoljno kasnije u prvoj petlji.
-    if (sada.second() != 0) {
-      return false;
-    }
+  if (!jeRtcSqwAktivan()) {
+    return false;
   }
 
+  const uint32_t rtcTick = dohvatiRtcSekundniBrojac();
+  if (rtcTick == zadnjiObradeniRtcTick) {
+    return false;
+  }
+  zadnjiObradeniRtcTick = rtcTick;
+
+  if (!jeVrijemeSvjezeZaRtcTick(rtcTick)) {
+    return false;
+  }
+
+  // Dok je RTC SQW dostupan, otkucavanje treba krenuti tocno na
+  // granici nove minute, a ne proizvoljno kasnije u prvoj petlji.
+  if (sada.second() != 0) {
+    return false;
+  }
+
+  const uint32_t kljucMinute = static_cast<uint32_t>(sada.unixtime() / 60UL);
   if (kljucMinute == zadnjiObradeniKljucMinute) {
     return false;
   }
@@ -205,11 +206,9 @@ void ponistiAktivnoOtkucavanje(bool jeOtkazivanje, const __FlashStringHelper* ra
   otkucavanje.preostaliUdarci = 0;
   otkucavanje.cekicAktivan = false;
   otkucavanje.aktivniPin = -1;
-  otkucavanje.vrijemePocetkaMs = 0UL;
   otkucavanje.vrijemeAktivacijeUs = 0UL;
-  otkucavanje.vrijemeZadnjePromjeneMs = 0UL;
   otkucavanje.trajanjeImpulsaMs = TRAJANJE_IMPULSA_CEKICA_DEFAULT;
-  otkucavanje.pauzaIzmeduUdaracaMs = PAUZA_MEZI_UDARACA_DEFAULT;
+  otkucavanje.sljedeciUdaracRtcTick = 0UL;
 
   if (razlog != nullptr) {
     char razlogBuffer[56];
@@ -235,8 +234,8 @@ void pokreniSljedeciUdarac() {
   aktivirajCekic_Internal(otkucavanje.aktivniPin, otkucavanje.trajanjeImpulsaMs);
   otkucavanje.cekicAktivan = true;
   otkucavanje.vrijemeAktivacijeUs = micros();
-  otkucavanje.vrijemeZadnjePromjeneMs = millis();
   otkucavanje.preostaliUdarci--;
+  otkucavanje.sljedeciUdaracRtcTick += 2U;
 
   char log[40];
   snprintf_P(log, sizeof(log), PSTR("Udarac: preostalo=%d"), otkucavanje.preostaliUdarci);
@@ -247,7 +246,7 @@ void pokreniSekvencuOtkucavanja(VrstaOtkucavanja vrsta,
                                 int brojUdaraca,
                                 int pinCekica,
                                 unsigned long trajanjeImpulsaMs,
-                                unsigned long pauzaIzmeduUdaracaMs,
+                                unsigned long /*pauzaIzmeduUdaracaMs*/,
                                 const __FlashStringHelper* opisSekvence) {
   if (brojUdaraca < 1) {
     return;
@@ -265,14 +264,11 @@ void pokreniSekvencuOtkucavanja(VrstaOtkucavanja vrsta,
   otkucavanje.vrsta = vrsta;
   otkucavanje.preostaliUdarci = brojUdaraca;
   otkucavanje.aktivniPin = pinCekica;
-  otkucavanje.vrijemePocetkaMs = 0UL;
   otkucavanje.cekicAktivan = false;
   otkucavanje.vrijemeAktivacijeUs = 0UL;
-  otkucavanje.vrijemeZadnjePromjeneMs = 0UL;
   otkucavanje.trajanjeImpulsaMs =
       normalizirajSigurnoTrajanjeCekicaMs(trajanjeImpulsaMs, SIGURNOSNI_MAX_TRAJANJE_CEKICA_MS);
-  otkucavanje.pauzaIzmeduUdaracaMs =
-      (pauzaIzmeduUdaracaMs == 0UL) ? PAUZA_MEZI_UDARACA_DEFAULT : pauzaIzmeduUdaracaMs;
+  otkucavanje.sljedeciUdaracRtcTick = dohvatiRtcSekundniBrojac();
 
   char opisSekvenceBuffer[40];
   char log[96];
@@ -286,10 +282,9 @@ void pokreniSekvencuOtkucavanja(VrstaOtkucavanja vrsta,
     signalizirajHammer2_Active();
   }
 
-  pokreniSljedeciUdarac();
 }
 
-void primijeniSigurnosniLimitCekicaInternal(unsigned long sadaUs, unsigned long sadaMs) {
+void primijeniSigurnosniLimitCekicaInternal(unsigned long sadaUs, unsigned long /*sadaMs*/) {
   for (int indeks = 0; indeks < 2; ++indeks) {
     if (!sigurnostCekica.aktivan[indeks]) {
       continue;
@@ -310,7 +305,6 @@ void primijeniSigurnosniLimitCekicaInternal(unsigned long sadaUs, unsigned long 
   if (otkucavanje.cekicAktivan && !jeCekicSigurnosnoAktivanZaPosebniNacin(otkucavanje.aktivniPin)) {
     otkucavanje.cekicAktivan = false;
     otkucavanje.vrijemeAktivacijeUs = 0UL;
-    otkucavanje.vrijemeZadnjePromjeneMs = sadaMs;
   }
 }
 
@@ -420,13 +414,11 @@ void inicijalizirajOtkucavanje() {
 
   otkucavanje.vrsta = OTKUCAVANJE_NONE;
   otkucavanje.preostaliUdarci = 0;
-  otkucavanje.vrijemePocetkaMs = 0UL;
   otkucavanje.cekicAktivan = false;
   otkucavanje.aktivniPin = -1;
   otkucavanje.vrijemeAktivacijeUs = 0UL;
-  otkucavanje.vrijemeZadnjePromjeneMs = 0UL;
   otkucavanje.trajanjeImpulsaMs = TRAJANJE_IMPULSA_CEKICA_DEFAULT;
-  otkucavanje.pauzaIzmeduUdaracaMs = PAUZA_MEZI_UDARACA_DEFAULT;
+  otkucavanje.sljedeciUdaracRtcTick = 0UL;
 
   sigurnostCekica.aktivan[0] = false;
   sigurnostCekica.aktivan[1] = false;
@@ -572,14 +564,19 @@ void upravljajOtkucavanjem() {
     return;
   }
 
-  unsigned long trajanjeImpulsa = otkucavanje.trajanjeImpulsaMs;
-  unsigned long pauzaMezi = otkucavanje.pauzaIzmeduUdaracaMs;
+  if (!jeRtcSqwAktivan()) {
+    ponistiAktivnoOtkucavanje(true, F("RTC SQW nije aktivan tijekom sekvence"));
+    return;
+  }
 
+  const uint32_t rtcTick = dohvatiRtcSekundniBrojac();
+  if (!jeVrijemeSvjezeZaRtcTick(rtcTick)) {
+    return;
+  }
+
+  unsigned long trajanjeImpulsa = otkucavanje.trajanjeImpulsaMs;
   if (trajanjeImpulsa == 0UL) {
     trajanjeImpulsa = TRAJANJE_IMPULSA_CEKICA_DEFAULT;
-  }
-  if (pauzaMezi == 0UL) {
-    pauzaMezi = PAUZA_MEZI_UDARACA_DEFAULT;
   }
 
   if (otkucavanje.cekicAktivan) {
@@ -588,19 +585,13 @@ void upravljajOtkucavanjem() {
       deaktivirajCekic_Internal(otkucavanje.aktivniPin);
       otkucavanje.cekicAktivan = false;
       otkucavanje.vrijemeAktivacijeUs = 0UL;
-      otkucavanje.vrijemeZadnjePromjeneMs = sadaMs;
     }
   } else {
-    if (otkucavanje.vrijemeZadnjePromjeneMs == 0UL) {
-      pokreniSljedeciUdarac();
-    } else {
-      const unsigned long proteklo = sadaMs - otkucavanje.vrijemeZadnjePromjeneMs;
-      if (proteklo >= pauzaMezi) {
-        if (otkucavanje.preostaliUdarci > 0) {
-          pokreniSljedeciUdarac();
-        } else {
-          ponistiAktivnoOtkucavanje(false, F("odradjeni svi udarci"));
-        }
+    if (static_cast<int32_t>(rtcTick - otkucavanje.sljedeciUdaracRtcTick) >= 0) {
+      if (otkucavanje.preostaliUdarci > 0) {
+        pokreniSljedeciUdarac();
+      } else {
+        ponistiAktivnoOtkucavanje(false, F("odradjeni svi udarci"));
       }
     }
   }

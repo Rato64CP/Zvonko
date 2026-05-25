@@ -55,7 +55,7 @@
 - `main/kazaljke_sata.*` - logika kazaljki i korekcije
 - `main/okretna_ploca.*` - upravljanje polozajem, fazama i cavlima
 - `main/zvonjenje.*` - upravljanje zvonima i inercijom
-- `main/otkucavanje.*` - cekici, satno i polusatno otkucavanje
+- `main/otkucavanje.*` - cekici, satno i polusatno otkucavanje na `RTC SQW` rasporedu
 - `main/slavljenje_mrtvacko.*` - posebni nacini rada cekica i thumbwheel timer mrtvackog
 - `main/pogrebne_skripte.*` - jednokratne sekvence `POKOJNIK` i `POKOJNICA`
 - `main/prekidac_tisine.*` - jedinstveni tihi rezim i lampica tihog moda
@@ -143,7 +143,7 @@
 - kvar `ESP32`: nema utjecaja na osnovni rad kazaljki, ploce, zvona i cekica
 - reset `Mega 2560`: recovery iz spremljenog stanja
 - nestanak napajanja: nastavak iz zadnjeg valjanog stanja
-- gubitak RTC SQW impulsa: kazaljke i ploca odmah gase aktivnu fazu bez dodatnog pomaka kako releji ne bi ostali ukljuceni
+- gubitak RTC SQW impulsa: kazaljke i ploca odmah gase aktivnu fazu bez dodatnog pomaka kako releji ne bi ostali ukljuceni, a redovno otkucavanje se ne izvodi dok se `SQW` ne vrati
 - gubitak `RTC/I2C` veze: aktivira se izlazni fail-safe i releji za zvona, cekice, kazaljke i plocu ostaju blokirani dok se `DS3231` ne oporavi
 - ponovljeni watchdog resetovi bez power-loss oznake: aktivira se `SUSTAV ZAKLJUCAN / PREVISE RESETA`
 - ponovljena nevaljana RTC ocitanja: aktivira se `RTC OGRANICEN RAD / CEKAM OPORAVAK` i automatika vremena se privremeno blokira
