@@ -2,30 +2,70 @@
 
 This document is a readable overview of all active pins and connections for the `Arduino Mega 2560` used in `ZVONKO v. 1.0`. The single source of truth remains [podesavanja_piny.h](../main/podesavanja_piny.h), while this file is meant as a service and installation reference.
 
-## Quick output overview
+## Quick overview of all active connections
 
-These pins are outputs from the `Arduino Mega 2560` toward relays, hammers, and indicator lamps of the tower clock.
+This table gives a service-level overview of all currently active `Arduino Mega 2560` connections, not only outputs.
 
-| Pin | Output | Type | Active state | Note |
-|---:|---|---|---|---|
-| `22` | Even hand relay | Relay | `HIGH` | Clock-hand impulse, even step |
-| `23` | Odd hand relay | Relay | `HIGH` | Clock-hand impulse, odd step |
-| `24` | Even plate relay | Relay | `HIGH` | First phase of rotating plate movement |
-| `25` | Odd plate relay | Relay | `HIGH` | Second phase of rotating plate movement |
-| `26` | Bell 1 | Relay | `HIGH` | Bell 1, automatic or manual |
-| `27` | Bell 2 | Relay | `HIGH` | Bell 2, automatic or manual |
-| `28` | Hammer 1 - male | Relay / hammer output | `HIGH` | Full-hour striking, celebration, and funeral mode |
-| `29` | Hammer 2 - female | Relay / hammer output | `HIGH` | Half-hour, quarter-hour, celebration, and funeral mode |
-| `35` | RS485 DE/RE direction | Digital control output | `HIGH=TX`, `LOW=RX` | `RS485` transceiver direction |
-| `36` | Bell 1 indicator | LED output | `HIGH` | Lit while bell 1 is active or in signaled rundown |
-| `37` | Bell 2 indicator | LED output | `HIGH` | Lit while bell 2 is active or in signaled rundown |
-| `38` | Celebration indicator | LED output | `HIGH` / blinking | Active celebration or thermal pause |
-| `39` | Funeral indicator | LED output | `HIGH` / blinking | Active funeral mode or waiting state |
-| `46` | Silent-mode indicator | LED output | `HIGH` | Final effective silent mode is active |
-| `47` | Night-light relay | Relay | `HIGH` | Enabled at night by solar automation |
-| `A10` | Evening sun indicator | LED output | `HIGH` | Evening solar automation enabled |
-| `A12` | Morning sun indicator | LED output | `HIGH` | Morning solar automation enabled |
-| `A14` | Noon sun indicator | LED output | `HIGH` | Noon solar automation enabled |
+| Pin | Function | Direction | Type / subsystem | Active state | Note |
+|---:|---|---|---|---|---|
+| `2` | `RTC SQW` | Input | Time synchronization | `1 Hz` pulse | `DS3231 SQW` reference clock |
+| `3` | `433 MHz DATA` | Input | Remote receiver | pulse signal | `SRX882` data output |
+| `7` | `UP` button | Input | Local menu | `LOW` | `INPUT_PULLUP` |
+| `8` | `DOWN` button | Input | Local menu | `LOW` | `INPUT_PULLUP` |
+| `9` | `LEFT` button | Input | Local menu | `LOW` | `INPUT_PULLUP` |
+| `10` | `RIGHT` button | Input | Local menu | `LOW` | `INPUT_PULLUP` |
+| `11` | `YES` button | Input | Local menu | `LOW` | `INPUT_PULLUP` |
+| `12` | `NO` button | Input | Local menu | `LOW` | `INPUT_PULLUP` |
+| `14` | `TX3` | Bidirectional | `ESP32` serial bridge | UART | `Serial3` toward `ESP32` |
+| `15` | `RX3` | Bidirectional | `ESP32` serial bridge | UART | `Serial3` toward `ESP32` |
+| `18` | `TX1` | Bidirectional | `RS485` | UART | `Serial1` for the `RS485` layer |
+| `19` | `RX1` | Bidirectional | `RS485` | UART | `Serial1` for the `RS485` layer |
+| `20` | `SDA` | Bidirectional | `I2C` | bus | `LCD`, `DS3231`, EEPROM/FRAM |
+| `21` | `SCL` | Bidirectional | `I2C` | bus | `LCD`, `DS3231`, EEPROM/FRAM |
+| `22` | Even hand relay | Output | Relay | `HIGH` | Clock-hand impulse, even step |
+| `23` | Odd hand relay | Output | Relay | `HIGH` | Clock-hand impulse, odd step |
+| `24` | Even plate relay | Output | Relay | `HIGH` | First phase of plate movement |
+| `25` | Odd plate relay | Output | Relay | `HIGH` | Second phase of plate movement |
+| `26` | Bell 1 | Output | Relay | `HIGH` | Bell 1, automatic or manual |
+| `27` | Bell 2 | Output | Relay | `HIGH` | Bell 2, automatic or manual |
+| `28` | Hammer 1 - male | Output | Relay / hammer | `HIGH` | Full hour, celebration, and funeral mode |
+| `29` | Hammer 2 - female | Output | Relay / hammer | `HIGH` | Half hour, quarter-hour, and special modes |
+| `30` | Plate pin 1 | Input | Rotating plate | via contact | Plate input |
+| `31` | Plate pin 2 | Input | Rotating plate | via contact | Plate input |
+| `32` | Plate pin 3 | Input | Rotating plate | via contact | Plate input |
+| `33` | Plate pin 4 | Input | Rotating plate | via contact | Plate input |
+| `34` | Plate pin 5 | Input | Rotating plate | via contact | Plate input |
+| `35` | `RS485 DE/RE` | Output | `RS485` control | `HIGH=TX` | Transceiver direction |
+| `36` | Bell 1 indicator | Output | LED | `HIGH` | Activity or signaled rundown |
+| `37` | Bell 2 indicator | Output | LED | `HIGH` | Activity or signaled rundown |
+| `38` | Celebration indicator | Output | LED | `HIGH` / blinking | Celebration or thermal pause |
+| `39` | Funeral indicator | Output | LED | `HIGH` / blinking | Funeral mode or waiting state |
+| `40` | Mains monitor | Input | `UPS` | `LOW=mains` | `HIGH` means UPS-only operation |
+| `41` | Silent-mode switch | Input | Silent mode | `LOW=ON` | `INPUT_PULLUP` |
+| `42` | Funeral button | Input | Special mode | `LOW` | Momentary `toggle` input |
+| `43` | Celebration switch | Input | Special mode | `LOW=ON` | `INPUT_PULLUP` |
+| `44` | Manual bell 1 switch | Input | Manual override | `LOW=ON` | `INPUT_PULLUP` |
+| `45` | Manual bell 2 switch | Input | Manual override | `LOW=ON` | `INPUT_PULLUP` |
+| `46` | Silent-mode indicator | Output | LED | `HIGH` | Final effective silent mode is active |
+| `47` | Night-light relay | Output | Relay | `HIGH` | Enabled at night by solar automation |
+| `A0` | Thumbwheel tens `1` | Input | Funeral timer | `LOW` to `GND` | `BCD 1` |
+| `A2` | Thumbwheel tens `2` | Input | Funeral timer | `LOW` to `GND` | `BCD 2` |
+| `A3` | Thumbwheel tens `4` | Input | Funeral timer | `LOW` to `GND` | `BCD 4` |
+| `A4` | Thumbwheel tens `8` | Input | Funeral timer | `LOW` to `GND` | `BCD 8` |
+| `A5` | Thumbwheel units `8` | Input | Funeral timer | `LOW` to `GND` | `BCD 8` |
+| `A6` | Thumbwheel units `4` | Input | Funeral timer | `LOW` to `GND` | `BCD 4` |
+| `A7` | Thumbwheel units `2` | Input | Funeral timer | `LOW` to `GND` | `BCD 2` |
+| `A8` | Thumbwheel units `1` | Input | Funeral timer | `LOW` to `GND` | `BCD 1` |
+| `A9` | Evening sun button | Input | Solar automation | `LOW` | Momentary service input |
+| `A10` | Evening sun indicator | Output | LED | `HIGH` | Evening automation state |
+| `A11` | Morning sun button | Input | Solar automation | `LOW` | Momentary service input |
+| `A12` | Morning sun indicator | Output | LED | `HIGH` | Morning automation state |
+| `A13` | Noon sun button | Input | Solar automation | `LOW` | Momentary service input |
+| `A14` | Noon sun indicator | Output | LED | `HIGH` | Noon automation state |
+
+Note:
+- `A1` is currently not part of the active tower-clock mapping
+- pins `5`, `6`, `16`, and `17` are currently unused by the active firmware
 
 ## Hand relays
 

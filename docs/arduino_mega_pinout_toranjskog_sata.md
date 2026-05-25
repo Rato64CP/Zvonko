@@ -2,30 +2,70 @@
 
 Ovaj dokument je citljiv pregled svih aktivnih pinova i konekcija za `Arduino Mega 2560` u sustavu `ZVONKO v. 1.0`. Glavni izvor istine i dalje ostaje [podesavanja_piny.h](../main/podesavanja_piny.h), a ova datoteka sluzi kao pomoc pri spajanju, servisiranju i provjeri instalacije.
 
-## Brzi pregled izlaznih pinova
+## Brzi pregled svih aktivnih konekcija
 
-Ovi pinovi su izlazi iz `Arduino Mega 2560` prema relejima, cekicima i signalnim lampicama toranjskog sata.
+Ova tablica daje servisni pregled svih trenutno aktivnih konekcija na `Arduino Mega 2560`, ne samo izlaza.
 
-| Pin | Izlaz | Tip | Aktivno stanje | Napomena |
-|---:|---|---|---|---|
-| `22` | Relej parne kazaljke | Relej | `HIGH` | Impuls kazaljki, parni korak |
-| `23` | Relej neparne kazaljke | Relej | `HIGH` | Impuls kazaljki, neparni korak |
-| `24` | Relej parne ploce | Relej | `HIGH` | Prva faza pomaka okretne ploce |
-| `25` | Relej neparne ploce | Relej | `HIGH` | Druga faza pomaka okretne ploce |
-| `26` | Zvono 1 | Relej | `HIGH` | Zvono 1, automatika ili rucna sklopka |
-| `27` | Zvono 2 | Relej | `HIGH` | Zvono 2, automatika ili rucna sklopka |
-| `28` | Cekic 1 - muski | Relej/izlaz cekica | `HIGH` | Puni sat, slavljenje i mrtvacko |
-| `29` | Cekic 2 - zenski | Relej/izlaz cekica | `HIGH` | Pola sata, kvartalno otkucavanje, slavljenje i mrtvacko |
-| `35` | RS485 DE/RE smjer | Digitalni upravljacki izlaz | `HIGH=TX`, `LOW=RX` | Smjer `RS485` transceivera |
-| `36` | Lampica Zvono 1 | LED izlaz | `HIGH` | Svijetli dok je zvono 1 aktivno ili u signaliziranom zavrsetku |
-| `37` | Lampica Zvono 2 | LED izlaz | `HIGH` | Svijetli dok je zvono 2 aktivno ili u signaliziranom zavrsetku |
-| `38` | Lampica Slavljenje | LED izlaz | `HIGH` / treptanje | Aktivno slavljenje ili termalna pauza |
-| `39` | Lampica Mrtvacko | LED izlaz | `HIGH` / treptanje | Aktivno mrtvacko ili cekanje zavrsetka |
-| `46` | Lampica tihog rezima | LED izlaz | `HIGH` | Konacni tihi rezim aktivan |
-| `47` | Relej nocne rasvjete | Relej | `HIGH` | Ukljucen nocu prema suncevoj automatici |
-| `A10` | Lampica sunce vece | LED izlaz | `HIGH` | Vecernja sunceva automatika ukljucena |
-| `A12` | Lampica sunce jutro | LED izlaz | `HIGH` | Jutarnja sunceva automatika ukljucena |
-| `A14` | Lampica sunce podne | LED izlaz | `HIGH` | Podnevna sunceva automatika ukljucena |
+| Pin | Funkcija | Smjer | Tip / podsustav | Aktivno stanje | Napomena |
+|---:|---|---|---|---|---|
+| `2` | `RTC SQW` | Ulaz | Sinkronizacija vremena | impuls `1 Hz` | `DS3231 SQW` referentni takt |
+| `3` | `433 MHz DATA` | Ulaz | Daljinski prijemnik | impulsni signal | `SRX882` data izlaz |
+| `7` | Tipka `GORE` | Ulaz | Lokalni izbornik | `LOW` | `INPUT_PULLUP` |
+| `8` | Tipka `DOLJE` | Ulaz | Lokalni izbornik | `LOW` | `INPUT_PULLUP` |
+| `9` | Tipka `LIJEVO` | Ulaz | Lokalni izbornik | `LOW` | `INPUT_PULLUP` |
+| `10` | Tipka `DESNO` | Ulaz | Lokalni izbornik | `LOW` | `INPUT_PULLUP` |
+| `11` | Tipka `DA` | Ulaz | Lokalni izbornik | `LOW` | `INPUT_PULLUP` |
+| `12` | Tipka `NE` | Ulaz | Lokalni izbornik | `LOW` | `INPUT_PULLUP` |
+| `14` | `TX3` | Dvosmjerno | `ESP32` serijski most | UART | `Serial3` prema `ESP32` |
+| `15` | `RX3` | Dvosmjerno | `ESP32` serijski most | UART | `Serial3` prema `ESP32` |
+| `18` | `TX1` | Dvosmjerno | `RS485` | UART | `Serial1` prema `RS485` sloju |
+| `19` | `RX1` | Dvosmjerno | `RS485` | UART | `Serial1` prema `RS485` sloju |
+| `20` | `SDA` | Dvosmjerno | `I2C` | sabirnica | `LCD`, `DS3231`, EEPROM/FRAM |
+| `21` | `SCL` | Dvosmjerno | `I2C` | sabirnica | `LCD`, `DS3231`, EEPROM/FRAM |
+| `22` | Relej parne kazaljke | Izlaz | Relej | `HIGH` | Impuls kazaljki, parni korak |
+| `23` | Relej neparne kazaljke | Izlaz | Relej | `HIGH` | Impuls kazaljki, neparni korak |
+| `24` | Relej parne ploce | Izlaz | Relej | `HIGH` | Prva faza pomaka okretne ploce |
+| `25` | Relej neparne ploce | Izlaz | Relej | `HIGH` | Druga faza pomaka okretne ploce |
+| `26` | Zvono 1 | Izlaz | Relej | `HIGH` | Zvono 1, automatika ili rucna sklopka |
+| `27` | Zvono 2 | Izlaz | Relej | `HIGH` | Zvono 2, automatika ili rucna sklopka |
+| `28` | Cekic 1 - muski | Izlaz | Relej/cekic | `HIGH` | Puni sat, slavljenje i mrtvacko |
+| `29` | Cekic 2 - zenski | Izlaz | Relej/cekic | `HIGH` | Pola sata, kvartalno i posebni nacini |
+| `30` | Cavao 1 | Ulaz | Okretna ploca | prema kontaktu | Ulaz ploce |
+| `31` | Cavao 2 | Ulaz | Okretna ploca | prema kontaktu | Ulaz ploce |
+| `32` | Cavao 3 | Ulaz | Okretna ploca | prema kontaktu | Ulaz ploce |
+| `33` | Cavao 4 | Ulaz | Okretna ploca | prema kontaktu | Ulaz ploce |
+| `34` | Cavao 5 | Ulaz | Okretna ploca | prema kontaktu | Ulaz ploce |
+| `35` | `RS485 DE/RE` | Izlaz | `RS485` upravljanje | `HIGH=TX` | Smjer transceivera |
+| `36` | Lampica Zvono 1 | Izlaz | LED | `HIGH` | Aktivnost ili signalizirani zavrsetak |
+| `37` | Lampica Zvono 2 | Izlaz | LED | `HIGH` | Aktivnost ili signalizirani zavrsetak |
+| `38` | Lampica Slavljenje | Izlaz | LED | `HIGH` / treptanje | Slavljenje ili termalna pauza |
+| `39` | Lampica Mrtvacko | Izlaz | LED | `HIGH` / treptanje | Mrtvacko ili cekanje zavrsetka |
+| `40` | Nadzor mreze | Ulaz | `UPS` | `LOW=mreza` | `HIGH` znaci rad samo s `UPS-a` |
+| `41` | Kip-prekidac tisine | Ulaz | Tihi rezim | `LOW=ON` | `INPUT_PULLUP` |
+| `42` | Tipka mrtvackog | Ulaz | Posebni nacin | `LOW` | Trenutni `toggle` ulaz |
+| `43` | Kip-prekidac slavljenja | Ulaz | Posebni nacin | `LOW=ON` | `INPUT_PULLUP` |
+| `44` | Rucna sklopka zvona 1 | Ulaz | Rucni override | `LOW=ON` | `INPUT_PULLUP` |
+| `45` | Rucna sklopka zvona 2 | Ulaz | Rucni override | `LOW=ON` | `INPUT_PULLUP` |
+| `46` | Lampica tihog rezima | Izlaz | LED | `HIGH` | Konacni tihi rezim aktivan |
+| `47` | Relej nocne rasvjete | Izlaz | Relej | `HIGH` | Ukljucen nocu prema suncevoj automatici |
+| `A0` | Thumbwheel desetice `1` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 1` |
+| `A2` | Thumbwheel desetice `2` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 2` |
+| `A3` | Thumbwheel desetice `4` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 4` |
+| `A4` | Thumbwheel desetice `8` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 8` |
+| `A5` | Thumbwheel jedinice `8` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 8` |
+| `A6` | Thumbwheel jedinice `4` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 4` |
+| `A7` | Thumbwheel jedinice `2` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 2` |
+| `A8` | Thumbwheel jedinice `1` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 1` |
+| `A9` | Tipka sunce vece | Ulaz | Sunceva automatika | `LOW` | Trenutni servisni unos |
+| `A10` | Lampica sunce vece | Izlaz | LED | `HIGH` | Stanje vecernje automatike |
+| `A11` | Tipka sunce jutro | Ulaz | Sunceva automatika | `LOW` | Trenutni servisni unos |
+| `A12` | Lampica sunce jutro | Izlaz | LED | `HIGH` | Stanje jutarnje automatike |
+| `A13` | Tipka sunce podne | Ulaz | Sunceva automatika | `LOW` | Trenutni servisni unos |
+| `A14` | Lampica sunce podne | Izlaz | LED | `HIGH` | Stanje podnevne automatike |
+
+Napomena:
+- `A1` trenutno nije dio aktivnog rasporeda toranjskog sata
+- pinovi `5`, `6`, `16` i `17` trenutačno nisu zauzeti aktivnim firmwareom
 
 ## Releji kazaljki
 
