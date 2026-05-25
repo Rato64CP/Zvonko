@@ -178,6 +178,7 @@
 - [README za ESP firmware](esp_firmware/README.md)
 - [Popis ESP web API ruta toranjskog sata](docs/esp_web_api_toranjskog_sata.md)
 - [Tehnicka dokumentacija firmware sustava](docs/tehnicka_dokumentacija_firmware_sustava.md)
+- [Arduino Mega pinout toranjskog sata](docs/arduino_mega_pinout_toranjskog_sata.md)
 
 ## 🛠️ Napomene Za Razvoj
 

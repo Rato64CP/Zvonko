@@ -12,19 +12,20 @@ Ovi pinovi su izlazi iz `Arduino Mega 2560` prema relejima, cekicima i signalnim
 | `23` | Relej neparne kazaljke | Relej | `HIGH` | Impuls kazaljki, neparni korak |
 | `24` | Relej parne ploce | Relej | `HIGH` | Prva faza pomaka okretne ploce |
 | `25` | Relej neparne ploce | Relej | `HIGH` | Druga faza pomaka okretne ploce |
-| `26` | Zvono 1 | Relej | `HIGH` | Zvono 1, ukljucuje se preko automatike ili rucne sklopke |
-| `27` | Zvono 2 | Relej | `HIGH` | Zvono 2, ukljucuje se preko automatike ili rucne sklopke |
-| `28` | Cekic 1 - muski | Relej/izlaz cekica | `HIGH` | Satno otkucavanje, slavljenje i mrtvacko |
-| `29` | Cekic 2 - zenski | Relej/izlaz cekica | `HIGH` | Polusatno otkucavanje, slavljenje i mrtvacko |
-| `35` | RS485 DE/RE smjer | Digitalni upravljacki izlaz | `HIGH=TX`, `LOW=RX` | Upravlja smjerom `RS485` transceivera toranjskog sata |
-| `36` | Lampica Zvono 1 | LED izlaz | `HIGH` | Svijetli dok je stvarno ukljuceno zvono 1 |
-| `37` | Lampica Zvono 2 | LED izlaz | `HIGH` | Svijetli dok je stvarno ukljuceno zvono 2 |
-| `38` | Lampica Slavljenje | LED izlaz | `HIGH` / treptanje | Svijetli dok slavljenje radi, trepce dok ceka kraj inercije |
-| `39` | Lampica Mrtvacko | LED izlaz | `HIGH` / treptanje | Svijetli dok mrtvacko radi, trepce dok ceka kraj inercije |
-| `46` | Lampica tihog rezima | LED izlaz | `HIGH` | Svijetli kad je aktivan rucni ili uskrsni tihi rezim |
+| `26` | Zvono 1 | Relej | `HIGH` | Zvono 1, automatika ili rucna sklopka |
+| `27` | Zvono 2 | Relej | `HIGH` | Zvono 2, automatika ili rucna sklopka |
+| `28` | Cekic 1 - muski | Relej/izlaz cekica | `HIGH` | Puni sat, slavljenje i mrtvacko |
+| `29` | Cekic 2 - zenski | Relej/izlaz cekica | `HIGH` | Pola sata, kvartalno otkucavanje, slavljenje i mrtvacko |
+| `35` | RS485 DE/RE smjer | Digitalni upravljacki izlaz | `HIGH=TX`, `LOW=RX` | Smjer `RS485` transceivera |
+| `36` | Lampica Zvono 1 | LED izlaz | `HIGH` | Svijetli dok je zvono 1 aktivno ili u signaliziranom zavrsetku |
+| `37` | Lampica Zvono 2 | LED izlaz | `HIGH` | Svijetli dok je zvono 2 aktivno ili u signaliziranom zavrsetku |
+| `38` | Lampica Slavljenje | LED izlaz | `HIGH` / treptanje | Aktivno slavljenje ili termalna pauza |
+| `39` | Lampica Mrtvacko | LED izlaz | `HIGH` / treptanje | Aktivno mrtvacko ili cekanje zavrsetka |
+| `46` | Lampica tihog rezima | LED izlaz | `HIGH` | Konacni tihi rezim aktivan |
 | `47` | Relej nocne rasvjete | Relej | `HIGH` | Ukljucen nocu prema suncevoj automatici |
-| `A10` | Lampica sunce vece | LED izlaz | `HIGH` | Svijetli kad je ukljucena vecernja sunceva automatika |
-| `A12` | Lampica sunce jutro | LED izlaz | `HIGH` | Svijetli kad je ukljucena jutarnja sunceva automatika |
+| `A10` | Lampica sunce vece | LED izlaz | `HIGH` | Vecernja sunceva automatika ukljucena |
+| `A12` | Lampica sunce jutro | LED izlaz | `HIGH` | Jutarnja sunceva automatika ukljucena |
+| `A14` | Lampica sunce podne | LED izlaz | `HIGH` | Podnevna sunceva automatika ukljucena |
 
 ## Releji kazaljki
 
@@ -47,7 +48,7 @@ Ovi pinovi su izlazi iz `Arduino Mega 2560` prema relejima, cekicima i signalnim
 | Zvono 1 | `26` | Relej zvona 1 |
 | Zvono 2 | `27` | Relej zvona 2 |
 | Cekic 1 - muski | `28` | Satno otkucavanje i posebni nacini |
-| Cekic 2 - zenski | `29` | Polusatno otkucavanje i posebni nacini |
+| Cekic 2 - zenski | `29` | Polusatno, kvartalno i posebni nacini |
 
 ## Nocna rasvjeta
 
@@ -75,8 +76,8 @@ Ovi pinovi su izlazi iz `Arduino Mega 2560` prema relejima, cekicima i signalnim
 
 | Funkcija | Pin | Napomena |
 |---|---:|---|
-| SDA | `20` | `DS3231 RTC` i vanjski EEPROM |
-| SCL | `21` | `DS3231 RTC` i vanjski EEPROM |
+| SDA | `20` | `DS3231 RTC`, vanjski EEPROM/FRAM i LCD |
+| SCL | `21` | `DS3231 RTC`, vanjski EEPROM/FRAM i LCD |
 
 ## Lokalne tipke izbornika
 
@@ -93,22 +94,33 @@ Sve tipke lokalnog izbornika rade kao `INPUT_PULLUP` i aktiviraju se spajanjem n
 
 Napomena:
 - stara matricna tipkovnica vise nije dio aktivnog firmware toka toranjskog sata
-- `433 MHz` prijemnik `SRX882` sada koristi `3` kao jedini data ulaz
+- `433 MHz` prijemnik `SRX882` koristi `3` kao jedini data ulaz
 - pinovi `5`, `16` i `17` ostaju slobodni za buduce prosirenje
+
+## Sunceve servisne tipke i lampice
+
+Lokalne servisne tipke `JUTRO`, `PODNE` i `VECER` rade kao trenutni ulazi i ne koriste kip-logiku.
+
+| Funkcija | Pin | Napomena |
+|---|---:|---|
+| Tipka sunce vece | `A9` | Trenutni unos za vecernju automatiku |
+| Lampica sunce vece | `A10` | Stanje vecernje automatike |
+| Tipka sunce jutro | `A11` | Trenutni unos za jutarnju automatiku |
+| Lampica sunce jutro | `A12` | Stanje jutarnje automatike |
+| Tipka sunce podne | `A13` | Trenutni unos za podnevnu automatiku |
+| Lampica sunce podne | `A14` | Stanje podnevne automatike |
 
 ## 433 MHz daljinski upravljac
 
 Predviden je sirovi `433 MHz` prijemnik `SRX882` s jednim data izlazom.
-Aktualna priprema toranjskog sata ocekuje da se iz tog signala prepozna nauceni kod tipke `C` za `toggle` slavljenja.
 
 | Funkcija | Pin | Napomena |
 |---|---:|---|
 | 433 `DATA` izlaz prijemnika | `3` | `SRX882` data signal prema prekidnom ulazu `Mega 2560` |
 
 Napomena:
-- tipka `C` daljinskog treba imati naucen kod u [main/daljinski_433.cpp](../main/daljinski_433.cpp)
-- jedan pritisak tipke `C` pali slavljenje, drugi ga gasi ili skida s cekanja
-- ako se koristi drugi daljinski protokol, dekoder u `main/daljinski_433.cpp` treba prilagoditi stvarnom okviru
+- nauceni kodovi tipki obradjuju se u [main/daljinski_433.cpp](../main/daljinski_433.cpp)
+- tipke `A`, `B`, `C` i `D` mogu pokretati zvona i slavljenje prema aktivnoj logici firmwarea
 
 ## Posebne tipke i prekidaci
 
@@ -135,19 +147,21 @@ Napomena:
 
 | Funkcija | Pin | Napomena |
 |---|---:|---|
-| Lampica Zvono 1 | `36` | `HIGH = upaljeno` |
-| Lampica Zvono 2 | `37` | `HIGH = upaljeno` |
-| Lampica Slavljenje | `38` | `HIGH = upaljeno`, trepce ako slavljenje ceka kraj inercije |
-| Lampica Mrtvacko | `39` | `HIGH = upaljeno`, trepce ako mrtvacko ceka kraj inercije |
+| Lampica Zvono 1 | `36` | `HIGH = upaljeno`, treperi tijekom inercije ili sinkronog zavrsetka |
+| Lampica Zvono 2 | `37` | `HIGH = upaljeno`, treperi tijekom inercije ili sinkronog zavrsetka |
+| Lampica Slavljenje | `38` | `HIGH = upaljeno`, treperi tijekom termalne pauze |
+| Lampica Mrtvacko | `39` | `HIGH = upaljeno`, treperi dok ceka kraj inercije |
 | Lampica Tihi rezim | `46` | `HIGH = upaljeno` |
 
 ## Thumbwheel za mrtvacko zvono
+
+Firmware koristi dvije `BCD 1-2-4-8` znamenke s `INPUT_PULLUP` logikom.
 
 ### Desetice
 
 | BCD bit | Pin | Napomena |
 |---|---:|---|
-| `1` | `A1` | Desetice bit 0 |
+| `1` | `A0` | Desetice bit 0 |
 | `2` | `A2` | Desetice bit 1 |
 | `4` | `A3` | Desetice bit 2 |
 | `8` | `A4` | Desetice bit 3 |
@@ -156,15 +170,15 @@ Napomena:
 
 | BCD bit | Pin | Napomena |
 |---|---:|---|
-| `1` | `A5` | Jedinice bit 0 |
-| `2` | `A6` | Jedinice bit 1 |
-| `4` | `A7` | Jedinice bit 2 |
-| `8` | `A8` | Jedinice bit 3 |
+| `1` | `A8` | Jedinice bit 0 |
+| `2` | `A7` | Jedinice bit 1 |
+| `4` | `A6` | Jedinice bit 2 |
+| `8` | `A5` | Jedinice bit 3 |
 
 Napomena:
-- thumbwheel treba zatvarati prema `GND`
-- firmware koristi `INPUT_PULLUP`
-- svaka znamenka je `BCD 1-2-4-8`
+- thumbwheel zatvara prema `GND`
+- firmware svaku znamenku cita kao `BCD 1-2-4-8`
+- `A1` trenutno nije dio aktivnog thumbwheel rasporeda
 
 ## Serijska komunikacija
 
@@ -176,24 +190,25 @@ Napomena:
 
 Aktualna postavka firmwarea:
 - `ESP_SERIJSKI_PORT = Serial3`
+- `RS485_SERIJSKI_PORT = Serial1`
 
 ## Kratki sazetak po rasponima pinova
 
 - `2` -> `RTC SQW`
-- `3` -> `433 MHz` `SRX882 DATA`
+- `3` -> `433 MHz SRX882 DATA`
 - `7-12` -> 6 direktnih tipki lokalnog izbornika
 - `14-15` -> `Serial3` prema vanjskom `ESP32`
-- `5`, `16`, `17` -> slobodni
+- `16-17` -> slobodni
 - `18-19` -> `Serial1` za aktivni `RS485`
 - `20-21` -> `I2C`
 - `22-29` -> releji kazaljki, ploce, zvona i cekica
 - `30-34` -> ulazi ploce
-- `40` -> nadzor mreznog napona za `UPS mod`
-- `36-39`, `46` -> signalne lampice
-- `41-45` -> tipke i sklopke
-- `47` -> relej nocne rasvjete
-- `A1-A8` -> thumbwheel
+- `35-39` -> `RS485` smjer i signalne lampice
+- `40-45` -> `UPS`, tihi rezim i fizicke sklopke
+- `46-47` -> lampica tihog rezima i nocna rasvjeta
+- `A0`, `A2-A8` -> thumbwheel mrtvackog
+- `A9-A14` -> servisne tipke i lampice sunceve automatike
 
 ## Napomena za razvoj
 
-Ako se raspored pinova ikad mijenja, prvo treba uskladiti [podesavanja_piny.h](../main/podesavanja_piny.h), a tek zatim ovu dokumentaciju.
+Ako se raspored pinova ikad mijenja, prvo treba uskladiti [podesavanja_piny.h](../main/podesavanja_piny.h), a tek zatim ovu dokumentaciju i sve povezane servisne upute.

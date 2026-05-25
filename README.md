@@ -85,7 +85,7 @@ The tower clock must remain operational even if the network layer is unavailable
 - `main/kazaljke_sata.*` – clock-hand motion and correction
 - `main/okretna_ploca.*` – plate position, phase logic, and pin reading
 - `main/zvonjenje.*` – bell control and inertia handling
-- `main/otkucavanje.*` – hourly and half-hour striking
+- `main/otkucavanje.*` – hourly and half-hour striking on an `RTC SQW` schedule
 - `main/slavljenje_mrtvacko.*` – celebration, funeral mode, and thumbwheel timing
 - `main/pogrebne_skripte.*` – one-shot `POKOJNIK` and `POKOJNICA` sequences
 - `main/prekidac_tisine.*` – unified silent mode and silent-mode indicator
@@ -176,7 +176,7 @@ The tower clock must remain operational even if the network layer is unavailable
 
 - external `24C32 EEPROM` or `FM24W256 FRAM` stores settings, `UnifiedMotionState`, DST status, and critical backup data
 - even with `FM24W256`, the firmware intentionally keeps the compatible layout within the first `4096 bytes`
-- `UnifiedMotionState` uses `24` rotating slots for the hands and rotating plate
+- `UnifiedMotionState` uses `48` rotating slots for the hands and rotating plate
 - each `UnifiedMotionState` slot has a checksum and invalid or partially written records are skipped
 - the last synchronization record has its own checksum while remaining compatible with older stored data
 - `power_recovery.*` restores the hands and rotating plate to a consistent state after restart
@@ -259,6 +259,7 @@ When changing EEPROM layout or recovery logic, always review:
 - Mega reset: state recovery from saved persistent state
 - power loss: continuation from the last valid state
 - loss of RTC SQW pulse: hands and rotating plate stop their active phase safely
+- regular striking does not run while `RTC SQW` is unavailable
 - loss of RTC/I2C connection: an output fail-safe blocks bells, hammers, hands, and rotating plate until the DS3231 recovers
 - repeated watchdog resets without a power-loss marker: `SUSTAV ZAKLJUCAN / PREVISE RESETA`
 - repeated invalid RTC readings: `RTC OGRANICEN RAD / CEKAM OPORAVAK`
@@ -304,7 +305,8 @@ When changing EEPROM layout or recovery logic, always review:
 - [Mega firmware README](main/README.md)
 - [ESP firmware README](esp_firmware/README.md)
 - [ESP web API routes](docs/esp_web_api_toranjskog_sata.md)
-- [Technical firmware documentation](docs/tehnicka_dokumentacija_firmware_sustava.md)
+- [Technical firmware documentation](docs/technical_firmware_documentation.md)
+- [Arduino Mega tower clock pinout](docs/arduino_mega_tower_clock_pinout.md)
 
 ## 🛠️ Development notes
 

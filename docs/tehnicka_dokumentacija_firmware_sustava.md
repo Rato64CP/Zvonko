@@ -41,6 +41,26 @@ Time se osigurava da nijedan podsustav ne gladuje, a svi rade ciklicki u malim k
 - **UI i postavke**: [main/tipke.cpp](../main/tipke.cpp), [main/menu_system.cpp](../main/menu_system.cpp), [main/postavke.cpp](../main/postavke.cpp)
 - **Otpornost i oporavak**: [main/watchdog.cpp](../main/watchdog.cpp), [main/power_recovery.cpp](../main/power_recovery.cpp), [main/wear_leveling.cpp](../main/wear_leveling.cpp), [main/i2c_eeprom.cpp](../main/i2c_eeprom.cpp)
 
+### Pinout i servisne veze
+Aktivni raspored pinova `Arduino Mega 2560` za toranjski sat dokumentiran je u:
+- [Arduino Mega pinout toranjskog sata](arduino_mega_pinout_toranjskog_sata.md)
+
+Najvaznije skupine pinova su:
+
+| Skupina | Pinovi | Uloga |
+|---|---|---|
+| `RTC SQW` | `2` | Glavni `1 Hz` takt za kazaljke, okretnu plocu i redovno otkucavanje |
+| `433 MHz` | `3` | `SRX882` prekidni ulaz za daljinski prijemnik |
+| Lokalne tipke izbornika | `7-12` | `GORE`, `DOLJE`, `LIJEVO`, `DESNO`, `DA`, `NE` |
+| `ESP32` most | `14-15` | `Serial3` prema vanjskom mreznom mostu |
+| `RS485` | `18-19`, `35` | Aktivni `RS485` transport i upravljanje smjerom |
+| `I2C` | `20-21` | `DS3231 RTC`, LCD i vanjski EEPROM/FRAM |
+| Releji kazaljki, ploce, zvona i cekica | `22-29` | Glavni izlazi mehanike toranjskog sata |
+| Ulazi ploce | `30-34` | Citanje cavala okretne ploce |
+| Lampice i modni ulazi | `36-47` | Lampice zvona, posebnih nacina, tihi rezim, `UPS`, sklopke i nocna rasvjeta |
+| Thumbwheel mrtvackog | `A0`, `A2-A8` | `BCD 1-2-4-8` timer ulaz |
+| Sunceve servisne tipke i lampice | `A9-A14` | Lokalni `JUTRO`, `PODNE`, `VECER` i pripadne lampice |
+
 ---
 
 ## 2. Unified State Model
