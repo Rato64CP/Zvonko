@@ -1,0 +1,12 @@
+# Arduino i ESP build artefakti toranjskog sata
+esp_firmware/build/
+*.elf
+*.bin
+*.map
+*.merged.bin
+*.partitions.bin
+*.bootloader.bin
+
+# Lokalni editor i OS zapisi
+.DS_Store
+Thumbs.db

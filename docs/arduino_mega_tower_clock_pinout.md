@@ -1,254 +1,254 @@
-# ZVONKO v. 1.0 - Arduino Mega tower clock pinout
+# ZVONKO v. 1.0 - Arduino Mega pinout toranjskog sata
 
-This document is a readable overview of all active pins and connections for the `Arduino Mega 2560` used in `ZVONKO v. 1.0`. The single source of truth remains [podesavanja_piny.h](../main/podesavanja_piny.h), while this file is meant as a service and installation reference.
+Ovaj dokument je citljiv pregled svih aktivnih pinova i konekcija za `Arduino Mega 2560` u sustavu `ZVONKO v. 1.0`. Glavni izvor istine i dalje ostaje [podesavanja_piny.h](../main/podesavanja_piny.h), a ova datoteka sluzi kao pomoc pri spajanju, servisiranju i provjeri instalacije.
 
-## Quick overview of all active connections
+## Brzi pregled svih aktivnih konekcija
 
-This table gives a service-level overview of all currently active `Arduino Mega 2560` connections, not only outputs.
+Ova tablica daje servisni pregled svih trenutno aktivnih konekcija na `Arduino Mega 2560`, ne samo izlaza.
 
-| Pin | Function | Direction | Type / subsystem | Active state | Note |
+| Pin | Funkcija | Smjer | Tip / podsustav | Aktivno stanje | Napomena |
 |---:|---|---|---|---|---|
-| `2` | `RTC SQW` | Input | Time synchronization | `1 Hz` pulse | `DS3231 SQW` reference clock |
-| `3` | `433 MHz DATA` | Input | Remote receiver | pulse signal | `SRX882` data output |
-| `7` | `UP` button | Input | Local menu | `LOW` | `INPUT_PULLUP` |
-| `8` | `DOWN` button | Input | Local menu | `LOW` | `INPUT_PULLUP` |
-| `9` | `LEFT` button | Input | Local menu | `LOW` | `INPUT_PULLUP` |
-| `10` | `RIGHT` button | Input | Local menu | `LOW` | `INPUT_PULLUP` |
-| `11` | `YES` button | Input | Local menu | `LOW` | `INPUT_PULLUP` |
-| `12` | `NO` button | Input | Local menu | `LOW` | `INPUT_PULLUP` |
-| `14` | `TX3` | Bidirectional | `ESP32` serial bridge | UART | `Serial3` toward `ESP32` |
-| `15` | `RX3` | Bidirectional | `ESP32` serial bridge | UART | `Serial3` toward `ESP32` |
-| `18` | `TX1` | Bidirectional | `RS485` | UART | `Serial1` for the `RS485` layer |
-| `19` | `RX1` | Bidirectional | `RS485` | UART | `Serial1` for the `RS485` layer |
-| `20` | `SDA` | Bidirectional | `I2C` | bus | `LCD`, `DS3231`, EEPROM/FRAM |
-| `21` | `SCL` | Bidirectional | `I2C` | bus | `LCD`, `DS3231`, EEPROM/FRAM |
-| `22` | Even hand relay | Output | Relay | `HIGH` | Clock-hand impulse, even step |
-| `23` | Odd hand relay | Output | Relay | `HIGH` | Clock-hand impulse, odd step |
-| `24` | Even plate relay | Output | Relay | `HIGH` | First phase of plate movement |
-| `25` | Odd plate relay | Output | Relay | `HIGH` | Second phase of plate movement |
-| `26` | Bell 1 | Output | Relay | `HIGH` | Bell 1, automatic or manual |
-| `27` | Bell 2 | Output | Relay | `HIGH` | Bell 2, automatic or manual |
-| `28` | Hammer 1 - male | Output | Relay / hammer | `HIGH` | Full hour, celebration, and funeral mode |
-| `29` | Hammer 2 - female | Output | Relay / hammer | `HIGH` | Half hour, quarter-hour, and special modes |
-| `30` | Plate pin 1 | Input | Rotating plate | via contact | Plate input |
-| `31` | Plate pin 2 | Input | Rotating plate | via contact | Plate input |
-| `32` | Plate pin 3 | Input | Rotating plate | via contact | Plate input |
-| `33` | Plate pin 4 | Input | Rotating plate | via contact | Plate input |
-| `34` | Plate pin 5 | Input | Rotating plate | via contact | Plate input |
-| `35` | `RS485 DE/RE` | Output | `RS485` control | `HIGH=TX` | Transceiver direction |
-| `36` | Bell 1 indicator | Output | LED | `HIGH` | Activity or signaled rundown |
-| `37` | Bell 2 indicator | Output | LED | `HIGH` | Activity or signaled rundown |
-| `38` | Celebration indicator | Output | LED | `HIGH` / blinking | Celebration or thermal pause |
-| `39` | Funeral indicator | Output | LED | `HIGH` / blinking | Funeral mode or waiting state |
-| `40` | Mains monitor | Input | `UPS` | `LOW=mains` | `HIGH` means UPS-only operation |
-| `41` | Silent-mode switch | Input | Silent mode | `LOW=ON` | `INPUT_PULLUP` |
-| `42` | Funeral button | Input | Special mode | `LOW` | Momentary `toggle` input |
-| `43` | Celebration switch | Input | Special mode | `LOW=ON` | `INPUT_PULLUP` |
-| `44` | Manual bell 1 switch | Input | Manual override | `LOW=ON` | `INPUT_PULLUP` |
-| `45` | Manual bell 2 switch | Input | Manual override | `LOW=ON` | `INPUT_PULLUP` |
-| `46` | Silent-mode indicator | Output | LED | `HIGH` | Final effective silent mode is active |
-| `47` | Night-light relay | Output | Relay | `HIGH` | Enabled at night by solar automation |
-| `A0` | Thumbwheel tens `1` | Input | Funeral timer | `LOW` to `GND` | `BCD 1` |
-| `A2` | Thumbwheel tens `2` | Input | Funeral timer | `LOW` to `GND` | `BCD 2` |
-| `A3` | Thumbwheel tens `4` | Input | Funeral timer | `LOW` to `GND` | `BCD 4` |
-| `A4` | Thumbwheel tens `8` | Input | Funeral timer | `LOW` to `GND` | `BCD 8` |
-| `A5` | Thumbwheel units `8` | Input | Funeral timer | `LOW` to `GND` | `BCD 8` |
-| `A6` | Thumbwheel units `4` | Input | Funeral timer | `LOW` to `GND` | `BCD 4` |
-| `A7` | Thumbwheel units `2` | Input | Funeral timer | `LOW` to `GND` | `BCD 2` |
-| `A8` | Thumbwheel units `1` | Input | Funeral timer | `LOW` to `GND` | `BCD 1` |
-| `A9` | Evening sun button | Input | Solar automation | `LOW` | Momentary service input |
-| `A10` | Evening sun indicator | Output | LED | `HIGH` | Evening automation state |
-| `A11` | Morning sun button | Input | Solar automation | `LOW` | Momentary service input |
-| `A12` | Morning sun indicator | Output | LED | `HIGH` | Morning automation state |
-| `A13` | Noon sun button | Input | Solar automation | `LOW` | Momentary service input |
-| `A14` | Noon sun indicator | Output | LED | `HIGH` | Noon automation state |
+| `2` | `RTC SQW` | Ulaz | Sinkronizacija vremena | impuls `1 Hz` | `DS3231 SQW` referentni takt |
+| `3` | `433 MHz DATA` | Ulaz | Daljinski prijemnik | impulsni signal | `SRX882` data izlaz |
+| `7` | Tipka `GORE` | Ulaz | Lokalni izbornik | `LOW` | `INPUT_PULLUP` |
+| `8` | Tipka `DOLJE` | Ulaz | Lokalni izbornik | `LOW` | `INPUT_PULLUP` |
+| `9` | Tipka `LIJEVO` | Ulaz | Lokalni izbornik | `LOW` | `INPUT_PULLUP` |
+| `10` | Tipka `DESNO` | Ulaz | Lokalni izbornik | `LOW` | `INPUT_PULLUP` |
+| `11` | Tipka `DA` | Ulaz | Lokalni izbornik | `LOW` | `INPUT_PULLUP` |
+| `12` | Tipka `NE` | Ulaz | Lokalni izbornik | `LOW` | `INPUT_PULLUP` |
+| `14` | `TX3` | Dvosmjerno | `ESP32` serijski most | UART | `Serial3` prema `ESP32` |
+| `15` | `RX3` | Dvosmjerno | `ESP32` serijski most | UART | `Serial3` prema `ESP32` |
+| `18` | `TX1` | Dvosmjerno | slobodno | UART | Rezervirano za buduce prosirenje |
+| `19` | `RX1` | Dvosmjerno | slobodno | UART | Rezervirano za buduce prosirenje |
+| `20` | `SDA` | Dvosmjerno | `I2C` | sabirnica | `LCD`, `DS3231`, EEPROM/FRAM |
+| `21` | `SCL` | Dvosmjerno | `I2C` | sabirnica | `LCD`, `DS3231`, EEPROM/FRAM |
+| `22` | Relej parne kazaljke | Izlaz | Relej | `HIGH` | Impuls kazaljki, parni korak |
+| `23` | Relej neparne kazaljke | Izlaz | Relej | `HIGH` | Impuls kazaljki, neparni korak |
+| `24` | Relej parne ploce | Izlaz | Relej | `HIGH` | Prva faza pomaka okretne ploce |
+| `25` | Relej neparne ploce | Izlaz | Relej | `HIGH` | Druga faza pomaka okretne ploce |
+| `26` | Zvono 1 | Izlaz | Relej | `HIGH` | Zvono 1, automatika ili rucna sklopka |
+| `27` | Zvono 2 | Izlaz | Relej | `HIGH` | Zvono 2, automatika ili rucna sklopka |
+| `28` | Cekic 1 - muski | Izlaz | Relej/cekic | `HIGH` | Puni sat, slavljenje i mrtvacko |
+| `29` | Cekic 2 - zenski | Izlaz | Relej/cekic | `HIGH` | Pola sata, kvartalno i posebni nacini |
+| `30` | Cavao 1 | Ulaz | Okretna ploca | prema kontaktu | Ulaz ploce |
+| `31` | Cavao 2 | Ulaz | Okretna ploca | prema kontaktu | Ulaz ploce |
+| `32` | Cavao 3 | Ulaz | Okretna ploca | prema kontaktu | Ulaz ploce |
+| `33` | Cavao 4 | Ulaz | Okretna ploca | prema kontaktu | Ulaz ploce |
+| `34` | Cavao 5 | Ulaz | Okretna ploca | prema kontaktu | Ulaz ploce |
+| `35` | slobodno | - | - | - | Pin vise nema dodijeljenu funkciju |
+| `36` | Lampica Zvono 1 | Izlaz | LED | `HIGH` | Aktivnost ili signalizirani zavrsetak |
+| `37` | Lampica Zvono 2 | Izlaz | LED | `HIGH` | Aktivnost ili signalizirani zavrsetak |
+| `38` | Lampica Slavljenje | Izlaz | LED | `HIGH` / treptanje | Slavljenje ili termalna pauza |
+| `39` | Lampica Mrtvacko | Izlaz | LED | `HIGH` / treptanje | Mrtvacko ili cekanje zavrsetka |
+| `40` | Nadzor mreze | Ulaz | `UPS` | `LOW=mreza` | `HIGH` znaci rad samo s `UPS-a` |
+| `41` | Kip-prekidac tisine | Ulaz | Tihi rezim | `LOW=ON` | `INPUT_PULLUP` |
+| `42` | Tipka mrtvackog | Ulaz | Posebni nacin | `LOW` | Trenutni `toggle` ulaz |
+| `43` | Kip-prekidac slavljenja | Ulaz | Posebni nacin | `LOW=ON` | `INPUT_PULLUP` |
+| `44` | Rucna sklopka zvona 1 | Ulaz | Rucni override | `LOW=ON` | `INPUT_PULLUP` |
+| `45` | Rucna sklopka zvona 2 | Ulaz | Rucni override | `LOW=ON` | `INPUT_PULLUP` |
+| `46` | Lampica tihog rezima | Izlaz | LED | `HIGH` | Konacni tihi rezim aktivan |
+| `47` | Relej nocne rasvjete | Izlaz | Relej | `HIGH` | Ukljucen nocu prema suncevoj automatici |
+| `A0` | Thumbwheel desetice `1` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 1` |
+| `A2` | Thumbwheel desetice `2` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 2` |
+| `A3` | Thumbwheel desetice `4` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 4` |
+| `A4` | Thumbwheel desetice `8` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 8` |
+| `A5` | Thumbwheel jedinice `8` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 8` |
+| `A6` | Thumbwheel jedinice `4` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 4` |
+| `A7` | Thumbwheel jedinice `2` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 2` |
+| `A8` | Thumbwheel jedinice `1` | Ulaz | Mrtvacko timer | `LOW` prema `GND` | `BCD 1` |
+| `A9` | Tipka sunce vece | Ulaz | Sunceva automatika | `LOW` | Trenutni servisni unos |
+| `A10` | Lampica sunce vece | Izlaz | LED | `HIGH` | Stanje vecernje automatike |
+| `A11` | Tipka sunce jutro | Ulaz | Sunceva automatika | `LOW` | Trenutni servisni unos |
+| `A12` | Lampica sunce jutro | Izlaz | LED | `HIGH` | Stanje jutarnje automatike |
+| `A13` | Tipka sunce podne | Ulaz | Sunceva automatika | `LOW` | Trenutni servisni unos |
+| `A14` | Lampica sunce podne | Izlaz | LED | `HIGH` | Stanje podnevne automatike |
 
-Note:
-- `A1` is currently not part of the active tower-clock mapping
-- pins `5`, `6`, `16`, and `17` are currently unused by the active firmware
+Napomena:
+- `A1` trenutno nije dio aktivnog rasporeda toranjskog sata
+- pinovi `5`, `6`, `16` i `17` trenutačno nisu zauzeti aktivnim firmwareom
 
-## Hand relays
+## Releji kazaljki
 
-| Function | Pin | Note |
+| Funkcija | Pin | Napomena |
 |---|---:|---|
-| Even hand relay | `22` | First phase of the hand impulse |
-| Odd hand relay | `23` | Second phase of the hand impulse |
+| Relej parne kazaljke | `22` | Prva faza impulsa za kazaljke |
+| Relej neparne kazaljke | `23` | Druga faza impulsa za kazaljke |
 
-## Rotating plate relays
+## Releji okretne ploce
 
-| Function | Pin | Note |
+| Funkcija | Pin | Napomena |
 |---|---:|---|
-| Even plate relay | `24` | First phase of rotating plate movement |
-| Odd plate relay | `25` | Second phase of rotating plate movement |
+| Relej parne ploce | `24` | Prva faza pomaka okretne ploce |
+| Relej neparne ploce | `25` | Druga faza pomaka okretne ploce |
 
-## Bells and hammers
+## Zvona i cekici
 
-| Function | Pin | Note |
+| Funkcija | Pin | Napomena |
 |---|---:|---|
-| Bell 1 | `26` | Bell 1 relay |
-| Bell 2 | `27` | Bell 2 relay |
-| Hammer 1 - male | `28` | Hour striking and special modes |
-| Hammer 2 - female | `29` | Half-hour, quarter-hour, and special modes |
+| Zvono 1 | `26` | Relej zvona 1 |
+| Zvono 2 | `27` | Relej zvona 2 |
+| Cekic 1 - muski | `28` | Satno otkucavanje i posebni nacini |
+| Cekic 2 - zenski | `29` | Polusatno, kvartalno i posebni nacini |
 
-## Night lighting
+## Nocna rasvjeta
 
-| Function | Pin | Note |
+| Funkcija | Pin | Napomena |
 |---|---:|---|
-| Night-light relay | `47` | `HIGH = night lighting ON` |
+| Relej nocne rasvjete | `47` | `HIGH = nocna rasvjeta ukljucena` |
 
-## Rotating plate inputs
+## Ulazi okretne ploce
 
-| Function | Pin | Note |
+| Funkcija | Pin | Napomena |
 |---|---:|---|
-| Plate pin 1 | `30` | Plate input |
-| Plate pin 2 | `31` | Plate input |
-| Plate pin 3 | `32` | Plate input |
-| Plate pin 4 | `33` | Plate input |
-| Plate pin 5 | `34` | Plate input |
+| Cavao 1 | `30` | Ulaz ploce |
+| Cavao 2 | `31` | Ulaz ploce |
+| Cavao 3 | `32` | Ulaz ploce |
+| Cavao 4 | `33` | Ulaz ploce |
+| Cavao 5 | `34` | Ulaz ploce |
 
-## Time synchronization
+## Sinkronizacija vremena
 
-| Function | Pin | Note |
+| Funkcija | Pin | Napomena |
 |---|---:|---|
-| RTC SQW 1 Hz | `2` | `DS3231 SQW` timing pulse |
+| RTC SQW 1 Hz | `2` | `DS3231 SQW` takt za precizno okidanje |
 
-## I2C bus
+## I2C sabirnica
 
-| Function | Pin | Note |
+| Funkcija | Pin | Napomena |
 |---|---:|---|
-| SDA | `20` | `DS3231 RTC`, external EEPROM/FRAM, and LCD |
-| SCL | `21` | `DS3231 RTC`, external EEPROM/FRAM, and LCD |
+| SDA | `20` | `DS3231 RTC`, vanjski EEPROM/FRAM i LCD |
+| SCL | `21` | `DS3231 RTC`, vanjski EEPROM/FRAM i LCD |
 
-## Local menu buttons
+## Lokalne tipke izbornika
 
-All local menu buttons use `INPUT_PULLUP` and become active when connected to `GND`.
+Sve tipke lokalnog izbornika rade kao `INPUT_PULLUP` i aktiviraju se spajanjem na `GND`.
 
-| Function | Pin | Note |
+| Funkcija | Pin | Napomena |
 |---|---:|---|
-| UP | `7` | Up navigation |
-| DOWN | `8` | Down navigation |
-| LEFT | `9` | Left navigation |
-| RIGHT | `10` | Right navigation |
-| YES | `11` | Confirm / `SELECT` |
-| NO | `12` | Back / `BACK` |
+| GORE | `7` | Navigacija prema gore |
+| DOLJE | `8` | Navigacija prema dolje |
+| LIJEVO | `9` | Navigacija prema lijevo |
+| DESNO | `10` | Navigacija prema desno |
+| DA | `11` | Potvrda / `SELECT` |
+| NE | `12` | Povratak / `BACK` |
 
-Note:
-- the old matrix keypad is no longer part of the active tower-clock firmware path
-- the `433 MHz` `SRX882` receiver uses pin `3` as its only data input
-- pins `5`, `16`, and `17` remain free for future expansion
+Napomena:
+- stara matricna tipkovnica vise nije dio aktivnog firmware toka toranjskog sata
+- `433 MHz` prijemnik `SRX882` koristi `3` kao jedini data ulaz
+- pinovi `5`, `16` i `17` ostaju slobodni za buduce prosirenje
 
-## Solar service buttons and indicators
+## Sunceve servisne tipke i lampice
 
-Local service buttons `MORNING`, `NOON`, and `EVENING` are momentary inputs and do not use a maintained toggle logic.
+Lokalne servisne tipke `JUTRO`, `PODNE` i `VECER` rade kao trenutni ulazi i ne koriste kip-logiku.
 
-| Function | Pin | Note |
+| Funkcija | Pin | Napomena |
 |---|---:|---|
-| Evening sun button | `A9` | Momentary input for evening automation |
-| Evening sun indicator | `A10` | Evening automation state |
-| Morning sun button | `A11` | Momentary input for morning automation |
-| Morning sun indicator | `A12` | Morning automation state |
-| Noon sun button | `A13` | Momentary input for noon automation |
-| Noon sun indicator | `A14` | Noon automation state |
+| Tipka sunce vece | `A9` | Trenutni unos za vecernju automatiku |
+| Lampica sunce vece | `A10` | Stanje vecernje automatike |
+| Tipka sunce jutro | `A11` | Trenutni unos za jutarnju automatiku |
+| Lampica sunce jutro | `A12` | Stanje jutarnje automatike |
+| Tipka sunce podne | `A13` | Trenutni unos za podnevnu automatiku |
+| Lampica sunce podne | `A14` | Stanje podnevne automatike |
 
-## 433 MHz remote receiver
+## 433 MHz daljinski upravljac
 
-The design expects a raw `433 MHz` `SRX882` receiver with a single data output.
+Predviden je sirovi `433 MHz` prijemnik `SRX882` s jednim data izlazom.
 
-| Function | Pin | Note |
+| Funkcija | Pin | Napomena |
 |---|---:|---|
-| 433 `DATA` receiver output | `3` | `SRX882` data signal toward the `Mega 2560` interrupt input |
+| 433 `DATA` izlaz prijemnika | `3` | `SRX882` data signal prema prekidnom ulazu `Mega 2560` |
 
-Note:
-- learned button codes are processed in [main/daljinski_433.cpp](../main/daljinski_433.cpp)
-- buttons `A`, `B`, `C`, and `D` can trigger bells and celebration according to the active firmware logic
+Napomena:
+- nauceni kodovi tipki obradjuju se u [main/daljinski_433.cpp](../main/daljinski_433.cpp)
+- tipke `A`, `B`, `C` i `D` mogu pokretati zvona i slavljenje prema aktivnoj logici firmwarea
 
-## Special buttons and switches
+## Posebne tipke i prekidaci
 
-| Function | Pin | Note |
+| Funkcija | Pin | Napomena |
 |---|---:|---|
-| Celebration toggle switch | `43` | `LOW = celebration ON` |
-| Funeral button | `42` | Press = `toggle` |
-| Silent-mode toggle switch | `41` | `LOW = silent mode ON` |
-| Manual bell 1 switch | `44` | `LOW = ON` |
-| Manual bell 2 switch | `45` | `LOW = ON` |
+| Kip-prekidac slavljenja | `43` | `LOW = slavljenje ukljuceno` |
+| Tipka mrtvackog | `42` | Pritisak radi `toggle` |
+| Kip-prekidac tihog rezima | `41` | `LOW = tihi rezim ON` |
+| Rucna sklopka zvona 1 | `44` | `LOW = ON` |
+| Rucna sklopka zvona 2 | `45` | `LOW = ON` |
 
-## Mains monitoring for UPS mode
+## Nadzor mreze za UPS mod
 
-| Function | Pin | Note |
+| Funkcija | Pin | Napomena |
 |---|---:|---|
-| Mains voltage monitor | `40` | `INPUT_PULLUP`, `LOW = mains present`, `HIGH = UPS only` |
+| Nadzor mreznog napona | `40` | `INPUT_PULLUP`, `LOW = mreza prisutna`, `HIGH = rad samo s UPS-a` |
 
-Note:
-- the input is intended for an optocoupler with an open-collector output toward `GND`
-- while `UPS mode` is enabled and this pin reports loss of mains power, the firmware blocks bells, hammers, and hands
-- the rotating plate remains active so the tower clock can still track the mechanical schedule
+Napomena:
+- ulaz je predviden za optokapler s open-collector izlazom prema `GND`
+- dok je `UPS mod` ukljucen i pin prijavi nestanak mreze, firmware blokira zvona, cekice i kazaljke
+- okretna ploca ostaje aktivna kako bi toranjski sat i dalje pratio mehanicki raspored
 
-## Indicator lamps
+## Signalne lampice
 
-| Function | Pin | Note |
+| Funkcija | Pin | Napomena |
 |---|---:|---|
-| Bell 1 indicator | `36` | `HIGH = on`, blinks during inertia or synchronized rundown |
-| Bell 2 indicator | `37` | `HIGH = on`, blinks during inertia or synchronized rundown |
-| Celebration indicator | `38` | `HIGH = on`, blinks during thermal pause |
-| Funeral indicator | `39` | `HIGH = on`, blinks while waiting for completion |
-| Silent-mode indicator | `46` | `HIGH = on` |
+| Lampica Zvono 1 | `36` | `HIGH = upaljeno`, treperi tijekom inercije ili sinkronog zavrsetka |
+| Lampica Zvono 2 | `37` | `HIGH = upaljeno`, treperi tijekom inercije ili sinkronog zavrsetka |
+| Lampica Slavljenje | `38` | `HIGH = upaljeno`, treperi tijekom termalne pauze |
+| Lampica Mrtvacko | `39` | `HIGH = upaljeno`, treperi dok ceka kraj inercije |
+| Lampica Tihi rezim | `46` | `HIGH = upaljeno` |
 
-## Funeral thumbwheel timer
+## Thumbwheel za mrtvacko zvono
 
-The firmware uses two `BCD 1-2-4-8` digits with `INPUT_PULLUP` logic.
+Firmware koristi dvije `BCD 1-2-4-8` znamenke s `INPUT_PULLUP` logikom.
 
-### Tens
+### Desetice
 
-| BCD bit | Pin | Note |
+| BCD bit | Pin | Napomena |
 |---|---:|---|
-| `1` | `A0` | Tens bit 0 |
-| `2` | `A2` | Tens bit 1 |
-| `4` | `A3` | Tens bit 2 |
-| `8` | `A4` | Tens bit 3 |
+| `1` | `A0` | Desetice bit 0 |
+| `2` | `A2` | Desetice bit 1 |
+| `4` | `A3` | Desetice bit 2 |
+| `8` | `A4` | Desetice bit 3 |
 
-### Units
+### Jedinice
 
-| BCD bit | Pin | Note |
+| BCD bit | Pin | Napomena |
 |---|---:|---|
-| `1` | `A8` | Units bit 0 |
-| `2` | `A7` | Units bit 1 |
-| `4` | `A6` | Units bit 2 |
-| `8` | `A5` | Units bit 3 |
+| `1` | `A8` | Jedinice bit 0 |
+| `2` | `A7` | Jedinice bit 1 |
+| `4` | `A6` | Jedinice bit 2 |
+| `8` | `A5` | Jedinice bit 3 |
 
-Note:
-- the thumbwheel closes toward `GND`
-- each digit is read as `BCD 1-2-4-8`
-- `A1` is currently not used by the active thumbwheel mapping
+Napomena:
+- thumbwheel zatvara prema `GND`
+- firmware svaku znamenku cita kao `BCD 1-2-4-8`
+- `A1` trenutno nije dio aktivnog thumbwheel rasporeda
 
-## Serial communication
+## Serijska komunikacija
 
-| Port | Pins | Role |
+| Port | Pinovi | Uloga |
 |---|---|---|
-| `Serial` | USB | PC logging and diagnostics (`115200`) |
-| `Serial1` | `RX1=19`, `TX1=18` | Active tower-clock `RS485` transport (`9600`) |
-| `Serial3` | `RX3=15`, `TX3=14` | External `ESP32` network bridge (`9600`) |
+| `Serial` | USB | PC log i dijagnostika (`115200`) |
+| `Serial1` | `RX1=19`, `TX1=18` | Slobodno za buduce prosirenje |
+| `Serial3` | `RX3=15`, `TX3=14` | Vanjski `ESP32` mrezni most (`9600`) |
 
-Current firmware assignments:
+Aktualna postavka firmwarea:
 - `ESP_SERIJSKI_PORT = Serial3`
-- `RS485_SERIJSKI_PORT = Serial1`
 
-## Short range summary
+## Kratki sazetak po rasponima pinova
 
 - `2` -> `RTC SQW`
 - `3` -> `433 MHz SRX882 DATA`
-- `7-12` -> 6 direct local menu buttons
-- `14-15` -> `Serial3` to the external `ESP32`
-- `16-17` -> free
-- `18-19` -> `Serial1` for active `RS485`
+- `7-12` -> 6 direktnih tipki lokalnog izbornika
+- `14-15` -> `Serial3` prema vanjskom `ESP32`
+- `16-17` -> slobodni
+- `18-19` -> slobodni `Serial1`
 - `20-21` -> `I2C`
-- `22-29` -> hand, plate, bell, and hammer relays
-- `30-34` -> plate inputs
-- `35-39` -> `RS485` direction and indicator lamps
-- `40-45` -> `UPS`, silent mode, and physical switches
-- `46-47` -> silent-mode lamp and night lighting
-- `A0`, `A2-A8` -> funeral thumbwheel
-- `A9-A14` -> solar service buttons and indicators
+- `22-29` -> releji kazaljki, ploce, zvona i cekica
+- `30-34` -> ulazi ploce
+- `35` -> slobodno
+- `36-39` -> signalne lampice zvona i posebnih nacina
+- `40-45` -> `UPS`, tihi rezim i fizicke sklopke
+- `46-47` -> lampica tihog rezima i nocna rasvjeta
+- `A0`, `A2-A8` -> thumbwheel mrtvackog
+- `A9-A14` -> servisne tipke i lampice sunceve automatike
 
-## Development note
+## Napomena za razvoj
 
-If the pin mapping ever changes, update [podesavanja_piny.h](../main/podesavanja_piny.h) first, and only then update this documentation and the related service notes.
+Ako se raspored pinova ikad mijenja, prvo treba uskladiti [podesavanja_piny.h](../main/podesavanja_piny.h), a tek zatim ovu dokumentaciju i sve povezane servisne upute.

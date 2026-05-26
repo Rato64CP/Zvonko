@@ -22,7 +22,6 @@
 #include "slavljenje_mrtvacko.h"
 #include "unified_motion_state.h"
 #include "watchdog.h"
-#include "rs485_bridge.h"
 #include "ups_nadzor.h"
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -128,8 +127,6 @@ static const char LCD_PORUKA_SQW_GRESKA[] PROGMEM = "SQW GRESKA      ";
 static const char LCD_PORUKA_LATCH_EEPROM_1[] PROGMEM = "EEPROM GRESKA   ";
 static const char LCD_PORUKA_LATCH_EEPROM_2[] PROGMEM = "ENT=POTVRDI     ";
 static const char LCD_PORUKA_INERCIJA[] PROGMEM = "Smirivanje zvona";
-static const char LCD_PORUKA_RS485_1[] PROGMEM = "VEZA TORANJ     ";
-static const char LCD_PORUKA_RS485_2[] PROGMEM = "PREKINUTA       ";
 static const char LCD_PORUKA_SAFE_MODE_1[] PROGMEM = "SUSTAV ZAKLJUCAN";
 static const char LCD_PORUKA_SAFE_MODE_2[] PROGMEM = "PREVISE RESETA  ";
 static const char LCD_PORUKA_SAFE_MODE_3[] PROGMEM = "DRZI ENT 5 SEK ";
@@ -141,7 +138,6 @@ static const unsigned long LCD_SAFE_MODE_BLINK_INTERVAL_MS = 500UL;
 static const unsigned long LCD_SAFE_MODE_UPUTA_INTERVAL_MS = 2000UL;
 static const unsigned long LCD_LATCHED_FAULT_INTERVAL_MS = 1500UL;
 static const unsigned long LCD_RTC_DEGRADED_INTERVAL_MS = 1500UL;
-static const unsigned long LCD_RS485_PREKID_INTERVAL_MS = 1500UL;
 static const unsigned long LCD_SQW_GRESKA_BLINK_INTERVAL_MS = 500UL;
 
 static void resetirajCachePrikazaLCD() {
@@ -573,27 +569,6 @@ static void build_line2() {
   if (rtc_battery_warning_active) {
     char poruka[17];
     FlashTekst::kopirajLiteral(poruka, sizeof(poruka), LCD_PORUKA_BAT_RTC);
-    pripremiDrugiRedakZaLCD(poruka);
-    return;
-  }
-
-  if (jeRS485VezaPrekinuta()) {
-    static bool prikaziDruguRs485Poruku = false;
-    static unsigned long zadnjaRs485PorukaMs = 0;
-    char poruka[17];
-    const unsigned long sadaMs = millis();
-
-    if (zadnjaRs485PorukaMs == 0) {
-      zadnjaRs485PorukaMs = sadaMs;
-    } else if ((sadaMs - zadnjaRs485PorukaMs) >= LCD_RS485_PREKID_INTERVAL_MS) {
-      zadnjaRs485PorukaMs = sadaMs;
-      prikaziDruguRs485Poruku = !prikaziDruguRs485Poruku;
-    }
-
-    FlashTekst::kopirajLiteral(
-        poruka,
-        sizeof(poruka),
-        prikaziDruguRs485Poruku ? LCD_PORUKA_RS485_2 : LCD_PORUKA_RS485_1);
     pripremiDrugiRedakZaLCD(poruka);
     return;
   }

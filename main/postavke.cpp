@@ -79,7 +79,6 @@ struct RadnePostavke {
   uint8_t modMrtvackog;
   bool ntpOmogucen;
   bool wifiOmogucen;
-  bool rs485Omogucen;
   bool upsModOmogucen;
   bool kocnicaZvonaOmogucena;
   bool imaKazaljke;
@@ -604,7 +603,6 @@ static void ucitajRadnePostavkeIzSpremnika(const EepromLayout::PostavkeSpremnik&
   postavke.modMrtvackog = spremnik.modMrtvackog;
   postavke.ntpOmogucen = procitajNtpOmogucenostIzTeksta(spremnik.ntpServer);
   postavke.wifiOmogucen = spremnik.wifiOmogucen;
-  postavke.rs485Omogucen = spremnik.rs485Omogucen;
   postavke.imaKazaljke = spremnik.imaKazaljke;
 }
 
@@ -646,7 +644,7 @@ static void upisiRadnePostavkeUSpremnik(EepromLayout::PostavkeSpremnik& spremnik
   spremnik.modOtkucavanja = postavke.modOtkucavanja;
   spremnik.modMrtvackog = postavke.modMrtvackog;
   spremnik.wifiOmogucen = postavke.wifiOmogucen;
-  spremnik.rs485Omogucen = postavke.rs485Omogucen;
+  spremnik.rezerviranoSerijskaVeza = false;
   spremnik.imaKazaljke = postavke.imaKazaljke;
 }
 
@@ -1163,14 +1161,13 @@ void ucitajPostavke() {
   snprintf_P(
       log,
       sizeof(log),
-      PSTR("Postavke: sat %d-%d, WiFi: %s SSID=%s, NTP: %s (%s), RS485: %s, UPS: %s, LCD: %s, Kazaljke: %s, Slavljenje: %u, Otkucavanje: %u, Mrtvacko: %u, Stapici TR/TN/TS=%u/%u/%u S=+%u, Zvona=%u, Mjesta=%u, Sunce maska=%u, Nocna rasvjeta=%s"),
+      PSTR("Postavke: sat %d-%d, WiFi: %s SSID=%s, NTP: %s (%s), UPS: %s, LCD: %s, Kazaljke: %s, Slavljenje: %u, Otkucavanje: %u, Mrtvacko: %u, Stapici TR/TN/TS=%u/%u/%u S=+%u, Zvona=%u, Mjesta=%u, Sunce maska=%u, Nocna rasvjeta=%s"),
       spremnik.satOd,
       spremnik.satDo,
       spremnik.wifiOmogucen ? "ON" : "OFF",
       spremnik.wifiSsid,
       dohvatiNtpServerBezZastavice(spremnik.ntpServer),
       procitajNtpOmogucenostIzTeksta(spremnik.ntpServer) ? "ON" : "OFF",
-      spremnik.rs485Omogucen ? "ON" : "OFF",
       procitajUPSModIzMaskeRazdoblja(spremnik.blagdaniRazdobljaMaska) ? "ON" : "OFF",
       spremnik.lcdPozadinskoOsvjetljenje ? "ON" : "OFF",
       spremnik.imaKazaljke ? "ON" : "OFF",
@@ -1411,10 +1408,6 @@ bool jeWiFiOmogucen() {
   return postavke.wifiOmogucen;
 }
 
-bool jeRS485Omogucen() {
-  return postavke.rs485Omogucen;
-}
-
 bool jeUPSModOmogucen() {
   return postavke.upsModOmogucen;
 }
@@ -1583,21 +1576,6 @@ void postaviWiFiOmogucen(bool omogucen) {
   spremiSpremnikPostavki(spremnik);
 
   posaljiPCLog(omogucen ? F("Postavke: WiFi ukljucen") : F("Postavke: WiFi iskljucen"));
-}
-
-void postaviRS485Omogucen(bool omogucen) {
-  if (postavke.rs485Omogucen == omogucen) {
-    return;
-  }
-
-  postavke.rs485Omogucen = omogucen;
-
-  EepromLayout::PostavkeSpremnik spremnik = napraviZadanePostavke();
-  ucitajSpremnikIliZadano(spremnik);
-  upisiRadnePostavkeUSpremnik(spremnik);
-  spremiSpremnikPostavki(spremnik);
-
-  posaljiPCLog(omogucen ? F("Postavke: RS485 ukljucen") : F("Postavke: RS485 iskljucen"));
 }
 
 void postaviUPSModOmogucen(bool omogucen) {

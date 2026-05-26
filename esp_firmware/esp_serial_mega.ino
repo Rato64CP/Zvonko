@@ -294,7 +294,6 @@ bool obradiStatusMegai(const char* payload) {
 bool obradiSustavskePostavkeMegai(char* payload) {
   bool lcdPozadinskoOsvjetljenje = false;
   bool logiranje = false;
-  bool rs485 = false;
   bool upsMod = false;
   bool kocnicaZvona = false;
   unsigned int inercijaZvona1Sekunde = 0;
@@ -303,7 +302,6 @@ bool obradiSustavskePostavkeMegai(char* payload) {
 
   if (!procitajBoolPolje(payload, "lcd=", &lcdPozadinskoOsvjetljenje) ||
       !procitajBoolPolje(payload, "log=", &logiranje) ||
-      !procitajBoolPolje(payload, "rs=", &rs485) ||
       !procitajBoolPolje(payload, "ups=", &upsMod) ||
       !procitajBoolPolje(payload, "koc=", &kocnicaZvona) ||
       !procitajUIntPolje(payload, "inr1=", &inercijaZvona1Sekunde) ||
@@ -315,7 +313,6 @@ bool obradiSustavskePostavkeMegai(char* payload) {
   megaSustavskePostavke.poznate = true;
   megaSustavskePostavke.lcdPozadinskoOsvjetljenje = lcdPozadinskoOsvjetljenje;
   megaSustavskePostavke.logiranje = logiranje;
-  megaSustavskePostavke.rs485 = rs485;
   megaSustavskePostavke.upsMod = upsMod;
   megaSustavskePostavke.kocnicaZvona = kocnicaZvona;
   megaSustavskePostavke.inercijaZvona1Sekunde =

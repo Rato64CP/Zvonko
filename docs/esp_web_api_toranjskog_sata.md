@@ -84,7 +84,6 @@ Vraća `JSON` tijelo oblika:
   "known": true,
   "lcd_backlight": true,
   "pc_logging": false,
-  "rs485_enabled": true,
   "ups_mode": false,
   "bell_brake": true,
   "inertia1_seconds": 90,
@@ -97,7 +96,6 @@ Polja:
 - `known`: je li `ESP` uspio dohvatiti stvarni paket `SET:SUSTAV|...` s `Mege`
 - `lcd_backlight`: stanje `LCD` pozadinskog osvjetljenja
 - `pc_logging`: stanje servisnog logiranja
-- `rs485_enabled`: stanje `RS485` komunikacije
 - `ups_mode`: stanje `UPS` moda
 - `bell_brake`: stanje rada s `K:0/1`
 - `inertia1_seconds`: `INR1` za prvo zvono

@@ -344,20 +344,6 @@ void postaviRucnuPozicijuKazaljki(int satKazaljke, int minutaKazaljke) {
   pokreniBudnoKorekciju();
 }
 
-void pomakniKazaljkeZa(int brojMinuta) {
-  if (!imaKazaljkeSata()) {
-    return;
-  }
-  EepromLayout::UnifiedMotionState stanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
-  int nova = static_cast<int>(stanje.hand_position) + brojMinuta;
-  while (nova < 0) nova += BROJ_MINUTA_CIKLUS;
-  stanje.hand_position = static_cast<uint16_t>(nova % BROJ_MINUTA_CIKLUS);
-  stanje.hand_active = HAND_NEAKTIVNO;
-  stanje.hand_relay = HAND_RELEJ_NIJEDAN;
-  aktivniKorakStartRtcTick = 0;
-  UnifiedMotionStateStore::spremiAkoPromjena(stanje);
-}
-
 bool suKazaljkeUSinkronu() {
   if (!imaKazaljkeSata()) {
     return true;
@@ -396,6 +382,3 @@ void postaviTrenutniPolozajKazaljki(int trenutnaMinuta) {
   UnifiedMotionStateStore::spremiAkoPromjena(stanje);
 }
 
-void pomakniKazaljkeNaMinutu(int ciljMinuta, bool) {
-  postaviTrenutniPolozajKazaljki(ciljMinuta);
-}

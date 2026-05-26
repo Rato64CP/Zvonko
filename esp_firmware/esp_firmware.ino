@@ -96,7 +96,6 @@ struct MegaSustavskePostavke {
   bool poznate;
   bool lcdPozadinskoOsvjetljenje;
   bool logiranje;
-  bool rs485;
   bool upsMod;
   bool kocnicaZvona;
   uint8_t inercijaZvona1Sekunde;
@@ -226,7 +225,6 @@ MegaSustavskePostavke megaSustavskePostavke = {
   false,
   false,
   false,
-  false,
   0,
   0,
   0U,
@@ -337,7 +335,6 @@ bool osvjeziPomicneBlagdaneMegai(bool prisilno);
 void posaljiJsonBlagdanskihPostavki(bool prisilno = false);
 PostavkeOdgovorMegai posaljiSustavskePostavkeMegai(bool lcdPozadinskoOsvjetljenje,
                                                    bool logiranje,
-                                                   bool rs485,
                                                    bool upsMod,
                                                    bool kocnicaZvona,
                                                    unsigned int inercijaZvona1Sekunde,

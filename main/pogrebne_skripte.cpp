@@ -188,20 +188,8 @@ void upravljajPogrebnimSkriptama(unsigned long sadaMs) {
   }
 }
 
-bool pokusajPokrenutiPokojnika() {
-  return pokreniPogrebnuSekvencu(MUSKO_ZVONO);
-}
-
-bool pokusajPokrenutiPokojnicu() {
-  return pokreniPogrebnuSekvencu(ZENSKO_ZVONO);
-}
-
 void zaustaviPogrebneSkripte() {
   zaustaviAktivnuSekvencuBezLoga();
-}
-
-bool jePogrebnaSkriptaAktivna() {
-  return stanje.aktivna;
 }
 
 uint8_t dohvatiTipAktivnePogrebneSkripte() {

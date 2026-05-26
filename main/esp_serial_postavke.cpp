@@ -78,13 +78,12 @@ bool parsirajIntPoljeSustava(const char* vrijednost, int& izlaz) {
 }  // namespace
 
 void posaljiSustavskePostavkeESPu() {
-  char linija[112];
+  char linija[96];
   snprintf_P(linija,
              sizeof(linija),
-             PSTR("SET:SUSTAV|lcd=%d|log=%d|rs=%d|ups=%d|koc=%d|inr1=%u|inr2=%u|imp=%u"),
+             PSTR("SET:SUSTAV|lcd=%d|log=%d|ups=%d|koc=%d|inr1=%u|inr2=%u|imp=%u"),
              jeLCDPozadinskoOsvjetljenjeUkljuceno() ? 1 : 0,
              jePCLogiranjeOmoguceno() ? 1 : 0,
-             jeRS485Omogucen() ? 1 : 0,
              jeUPSModOmogucen() ? 1 : 0,
              jeKocnicaZvonaOmogucena() ? 1 : 0,
              static_cast<unsigned>(dohvatiInercijuZvona1Sekunde()),
@@ -218,12 +217,10 @@ bool spremiSustavskePostavkeIzESPa(char* payload) {
 
   bool lcdPoznato = false;
   bool logPoznato = false;
-  bool rsPoznato = false;
   bool upsPoznato = false;
   bool kocPoznato = false;
   bool lcdUkljuceno = false;
   bool logOmogucen = false;
-  bool rsOmogucen = false;
   bool upsOmogucen = false;
   bool kocOmogucena = false;
   unsigned int inr1 = 0;
@@ -256,9 +253,6 @@ bool spremiSustavskePostavkeIzESPa(char* payload) {
     } else if (strcmp(kljuc, "log") == 0) {
       if (!parsirajBoolZastavicuSustava(vrijednost, logOmogucen)) return false;
       logPoznato = true;
-    } else if (strcmp(kljuc, "rs") == 0) {
-      if (!parsirajBoolZastavicuSustava(vrijednost, rsOmogucen)) return false;
-      rsPoznato = true;
     } else if (strcmp(kljuc, "ups") == 0) {
       if (!parsirajBoolZastavicuSustava(vrijednost, upsOmogucen)) return false;
       upsPoznato = true;
@@ -279,14 +273,13 @@ bool spremiSustavskePostavkeIzESPa(char* payload) {
     }
   }
 
-  if (!lcdPoznato || !logPoznato || !rsPoznato || !upsPoznato || !kocPoznato ||
+  if (!lcdPoznato || !logPoznato || !upsPoznato || !kocPoznato ||
       !inr1Poznat || !inr2Poznat || !impulsPoznat) {
     return false;
   }
 
   postaviLCDPozadinskoOsvjetljenje(lcdUkljuceno);
   postaviPCLogiranjeOmoguceno(logOmogucen);
-  postaviRS485Omogucen(rsOmogucen);
   postaviUPSModOmogucen(upsOmogucen);
   postaviKocnicuZvonaOmoguceno(kocOmogucena);
   postaviInercijeZvona(static_cast<uint8_t>(inr1), static_cast<uint8_t>(inr2));
@@ -295,10 +288,9 @@ bool spremiSustavskePostavkeIzESPa(char* payload) {
   char log[128];
   snprintf_P(log,
              sizeof(log),
-             PSTR("Mrezni most je spremio sustavske postavke: lcd=%d log=%d rs=%d ups=%d koc=%d inr1=%u inr2=%u imp=%u"),
+             PSTR("Mrezni most je spremio sustavske postavke: lcd=%d log=%d ups=%d koc=%d inr1=%u inr2=%u imp=%u"),
              lcdUkljuceno ? 1 : 0,
              logOmogucen ? 1 : 0,
-             rsOmogucen ? 1 : 0,
              upsOmogucen ? 1 : 0,
              kocOmogucena ? 1 : 0,
              inr1,

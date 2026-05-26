@@ -18,8 +18,8 @@ Ova tablica daje servisni pregled svih trenutno aktivnih konekcija na `Arduino M
 | `12` | Tipka `NE` | Ulaz | Lokalni izbornik | `LOW` | `INPUT_PULLUP` |
 | `14` | `TX3` | Dvosmjerno | `ESP32` serijski most | UART | `Serial3` prema `ESP32` |
 | `15` | `RX3` | Dvosmjerno | `ESP32` serijski most | UART | `Serial3` prema `ESP32` |
-| `18` | `TX1` | Dvosmjerno | `RS485` | UART | `Serial1` prema `RS485` sloju |
-| `19` | `RX1` | Dvosmjerno | `RS485` | UART | `Serial1` prema `RS485` sloju |
+| `18` | `TX1` | Dvosmjerno | slobodno | UART | Rezervirano za buduce prosirenje |
+| `19` | `RX1` | Dvosmjerno | slobodno | UART | Rezervirano za buduce prosirenje |
 | `20` | `SDA` | Dvosmjerno | `I2C` | sabirnica | `LCD`, `DS3231`, EEPROM/FRAM |
 | `21` | `SCL` | Dvosmjerno | `I2C` | sabirnica | `LCD`, `DS3231`, EEPROM/FRAM |
 | `22` | Relej parne kazaljke | Izlaz | Relej | `HIGH` | Impuls kazaljki, parni korak |
@@ -35,7 +35,7 @@ Ova tablica daje servisni pregled svih trenutno aktivnih konekcija na `Arduino M
 | `32` | Cavao 3 | Ulaz | Okretna ploca | prema kontaktu | Ulaz ploce |
 | `33` | Cavao 4 | Ulaz | Okretna ploca | prema kontaktu | Ulaz ploce |
 | `34` | Cavao 5 | Ulaz | Okretna ploca | prema kontaktu | Ulaz ploce |
-| `35` | `RS485 DE/RE` | Izlaz | `RS485` upravljanje | `HIGH=TX` | Smjer transceivera |
+| `35` | slobodno | - | - | - | Pin vise nema dodijeljenu funkciju |
 | `36` | Lampica Zvono 1 | Izlaz | LED | `HIGH` | Aktivnost ili signalizirani zavrsetak |
 | `37` | Lampica Zvono 2 | Izlaz | LED | `HIGH` | Aktivnost ili signalizirani zavrsetak |
 | `38` | Lampica Slavljenje | Izlaz | LED | `HIGH` / treptanje | Slavljenje ili termalna pauza |
@@ -225,12 +225,11 @@ Napomena:
 | Port | Pinovi | Uloga |
 |---|---|---|
 | `Serial` | USB | PC log i dijagnostika (`115200`) |
-| `Serial1` | `RX1=19`, `TX1=18` | Aktivni `RS485` transport toranjskog sata (`9600`) |
+| `Serial1` | `RX1=19`, `TX1=18` | Slobodno za buduce prosirenje |
 | `Serial3` | `RX3=15`, `TX3=14` | Vanjski `ESP32` mrezni most (`9600`) |
 
 Aktualna postavka firmwarea:
 - `ESP_SERIJSKI_PORT = Serial3`
-- `RS485_SERIJSKI_PORT = Serial1`
 
 ## Kratki sazetak po rasponima pinova
 
@@ -239,11 +238,12 @@ Aktualna postavka firmwarea:
 - `7-12` -> 6 direktnih tipki lokalnog izbornika
 - `14-15` -> `Serial3` prema vanjskom `ESP32`
 - `16-17` -> slobodni
-- `18-19` -> `Serial1` za aktivni `RS485`
+- `18-19` -> slobodni `Serial1`
 - `20-21` -> `I2C`
 - `22-29` -> releji kazaljki, ploce, zvona i cekica
 - `30-34` -> ulazi ploce
-- `35-39` -> `RS485` smjer i signalne lampice
+- `35` -> slobodno
+- `36-39` -> signalne lampice zvona i posebnih nacina
 - `40-45` -> `UPS`, tihi rezim i fizicke sklopke
 - `46-47` -> lampica tihog rezima i nocna rasvjeta
 - `A0`, `A2-A8` -> thumbwheel mrtvackog

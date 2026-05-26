@@ -1,5 +1,5 @@
-// eeprom_konstante.h - CONSOLIDATED EEPROM ADDRESS DEFINITIONS
-// SINGLE SOURCE OF TRUTH for all EEPROM address assignments
+// eeprom_konstante.h - objedinjene definicije EEPROM adresa
+// Jedino mjesto istine za sve adrese trajne pohrane toranjskog sata.
 // FM24W256 FRAM na RTC plocici nudi veci fizicki kapacitet, ali toranjski sat
 // namjerno zadrzava postojeci kompatibilni raspored unutar prvih 4096 bajtova.
 // Tako recovery logika, slotovi i stare postavke ostaju nepromijenjeni.
@@ -13,15 +13,15 @@ namespace EepromLayout {
 
 constexpr int LOGICKI_KAPACITET_KOMPATIBILNOG_RASPOREDA = 4096;
 
-// ==================== HAND POSITION (K-MINUTA) ====================
-// Software position 0-719 for 12-hour cycle (0-720 minutes)
-// Stored in external FRAM/EEPROM kompatibilnom prostoru za power-loss recovery
+// ==================== POLOZAJ KAZALJKI (K-MINUTA) ====================
+// Softverska pozicija 0-719 za 12-satni ciklus kazaljki.
+// Sprema se u vanjski FRAM/EEPROM prostor za power-loss recovery.
 
 constexpr int BAZA_KAZALJKE = 0;
 constexpr int SLOTOVI_KAZALJKE = 6;
 constexpr int SLOT_SIZE_KAZALJKE = 4;
 
-// ==================== ROTATING PLATE STATE ====================
+// ==================== STANJE OKRETNE PLOCE ====================
 // Autoritativno stanje okretne ploce za toranjski sat:
 // - format "XXP" ili "XXN" (npr. 00P, 00N, 63N)
 // - XX je pozicija 00-63
@@ -32,8 +32,8 @@ constexpr int BAZA_STANJE_PLOCE =
 constexpr int SLOTOVI_STANJE_PLOCE = 6;
 constexpr int SLOT_SIZE_STANJE_PLOCE = 4;
 
-// ==================== TIME SOURCE TRACKING ====================
-// Tracks which source provided current time (RTC or NTP)
+// ==================== PRACENJE IZVORA VREMENA ====================
+// Pamti je li trenutno vrijeme doslo iz RTC-a ili NTP-a.
 
 struct ZadnjaSinkronizacija {
   uint8_t izvor;
@@ -48,25 +48,25 @@ constexpr int SLOT_SIZE_ZADNJA_SINKRONIZACIJA = sizeof(ZadnjaSinkronizacija);
 static_assert(SLOT_SIZE_ZADNJA_SINKRONIZACIJA == 6,
               "Zadnja sinkronizacija mora ostati u 6 bajtova radi kompatibilnosti EEPROM rasporeda");
 
-// ==================== SYSTEM SETTINGS ====================
-// User-configurable settings persisted in EEPROM
-// Includes bell/hammer timing, LCD, WiFi credentials, and operation hours
+// ==================== POSTAVKE SUSTAVA ====================
+// Korisnicke postavke toranjskog sata spremljene u EEPROM.
+// Ukljucuju vremena zvona/cekica, LCD, WiFi podatke i radne sate.
 
 struct PostavkeSpremnik {
   uint16_t potpis;
   uint8_t verzija;
 
-  // Bell operation hours
+  // Radni sati zvona.
   int satOd;
   int satDo;
   int tihiSatiOd;
   int tihiSatiDo;
 
-  // Plate operation window (minutes from midnight)
+  // Radni prozor okretne ploce u minutama od ponoci.
   int plocaPocetakMinuta;
   int plocaKrajMinuta;
 
-  // Bell/hammer timing
+  // Trajanja zvona, cekica i povezanih odgoda.
   unsigned int trajanjeImpulsaCekicaMs;
   unsigned int pauzaIzmeduUdaraca;
   uint8_t trajanjeZvonjenjaRadniMin;
@@ -86,7 +86,7 @@ struct PostavkeSpremnik {
   uint8_t cavliNedjelja[4];
   uint8_t cavaoSlavljenje;
 
-  // Network and LCD settings
+  // Mrezne i LCD postavke.
   char wifiSsid[33];
   char wifiLozinka[33];
   bool koristiDhcp;
@@ -108,7 +108,8 @@ struct PostavkeSpremnik {
   char zadaniGateway[16];
   char ntpServer[40];
   bool wifiOmogucen;
-  bool rs485Omogucen;
+  // Rezervirano mjesto starog serijskog prekidaca radi stabilnog EEPROM rasporeda.
+  bool rezerviranoSerijskaVeza;
   bool imaKazaljke;
   uint16_t checksum;
 };
@@ -123,8 +124,8 @@ constexpr int BAZA_POSTAVKE =
 constexpr int SLOTOVI_POSTAVKE = 6;
 constexpr int SLOT_SIZE_POSTAVKE = sizeof(PostavkeSpremnik);
 
-// ==================== POWER RECOVERY STATE ====================
-// System state for recovery after power loss
+// ==================== POWER RECOVERY STANJE ====================
+// Stanje sustava za oporavak nakon gubitka napajanja.
 
 struct SystemStateBackup {
   uint32_t hand_position_k_minuta;
@@ -286,7 +287,7 @@ constexpr int BAZA_MISE =
 constexpr int SLOTOVI_MISE = 6;
 constexpr int SLOT_SIZE_MISE = sizeof(MiseSpremnik);
 
-// ==================== VALIDATION MACROS ====================
+// ==================== PROVJERE RASPOREDA ====================
 
 // Zadnji dio kompatibilnog 4 KB rasporeda rezerviran je za metapodatke wear-levelinga.
 constexpr int BAZA_WEAR_LEVELING_META = 3968;

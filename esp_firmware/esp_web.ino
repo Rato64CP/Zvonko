@@ -110,7 +110,6 @@ void posaljiJsonStatus(bool prisilno) {
 
 PostavkeOdgovorMegai posaljiSustavskePostavkeMegai(bool lcdPozadinskoOsvjetljenje,
                                                    bool logiranje,
-                                                   bool rs485,
                                                    bool upsMod,
                                                    bool kocnicaZvona,
                                                    unsigned int inercijaZvona1Sekunde,
@@ -122,10 +121,9 @@ PostavkeOdgovorMegai posaljiSustavskePostavkeMegai(bool lcdPozadinskoOsvjetljenj
   char naredba[112];
   snprintf(naredba,
            sizeof(naredba),
-           "SETCFG:SUSTAV|lcd=%d|log=%d|rs=%d|ups=%d|koc=%d|inr1=%u|inr2=%u|imp=%u",
+           "SETCFG:SUSTAV|lcd=%d|log=%d|ups=%d|koc=%d|inr1=%u|inr2=%u|imp=%u",
            lcdPozadinskoOsvjetljenje ? 1 : 0,
            logiranje ? 1 : 0,
-           rs485 ? 1 : 0,
            upsMod ? 1 : 0,
            kocnicaZvona ? 1 : 0,
            inercijaZvona1Sekunde,
@@ -352,11 +350,10 @@ void posaljiJsonSustavskihPostavki(bool prisilno) {
   char tijelo[320];
   snprintf_P(tijelo,
              sizeof(tijelo),
-             PSTR("{\"known\":%s,\"lcd_backlight\":%s,\"pc_logging\":%s,\"rs485_enabled\":%s,\"ups_mode\":%s,\"bell_brake\":%s,\"inertia1_seconds\":%u,\"inertia2_seconds\":%u,\"hammer_pulse_ms\":%u}"),
+             PSTR("{\"known\":%s,\"lcd_backlight\":%s,\"pc_logging\":%s,\"ups_mode\":%s,\"bell_brake\":%s,\"inertia1_seconds\":%u,\"inertia2_seconds\":%u,\"hammer_pulse_ms\":%u}"),
              megaSustavskePostavke.poznate ? "true" : "false",
              (megaSustavskePostavke.poznate && megaSustavskePostavke.lcdPozadinskoOsvjetljenje) ? "true" : "false",
              (megaSustavskePostavke.poznate && megaSustavskePostavke.logiranje) ? "true" : "false",
-             (megaSustavskePostavke.poznate && megaSustavskePostavke.rs485) ? "true" : "false",
              (megaSustavskePostavke.poznate && megaSustavskePostavke.upsMod) ? "true" : "false",
              (megaSustavskePostavke.poznate && megaSustavskePostavke.kocnicaZvona) ? "true" : "false",
              static_cast<unsigned>(megaSustavskePostavke.poznate ? megaSustavskePostavke.inercijaZvona1Sekunde : 0U),
@@ -1226,13 +1223,6 @@ static const char WEB_POSTAVKE_STRANICA[] PROGMEM = R"HTML(
             </div>
           </div>
           <div class="field">
-            <label for="rs485Enabled">RS485</label>
-            <div class="toggle-row">
-              <small>Omogucuje vanjsku RS485 komunikaciju tornjskog sata.</small>
-              <button id="rs485Enabled" type="button" class="toggle-chip" onclick="prebaciToggle('rs485Enabled')">ISKLJUCENO</button>
-            </div>
-          </div>
-          <div class="field">
             <label for="upsMode">UPS mod</label>
             <div class="toggle-row">
               <small>Ponasanje sustava pri radu preko rezervnog napajanja.</small>
@@ -1457,7 +1447,6 @@ static const char WEB_POSTAVKE_STRANICA[] PROGMEM = R"HTML(
     const stanje = {
       lcdBacklight: false,
       pcLogging: false,
-      rs485Enabled: false,
       upsMode: false,
       bellBrake: false,
       jutroEnabled: false,
@@ -1491,12 +1480,10 @@ static const char WEB_POSTAVKE_STRANICA[] PROGMEM = R"HTML(
     function popuniSustav(podaci) {
       stanje.lcdBacklight = !!podaci.lcd_backlight;
       stanje.pcLogging = !!podaci.pc_logging;
-      stanje.rs485Enabled = !!podaci.rs485_enabled;
       stanje.upsMode = !!podaci.ups_mode;
       stanje.bellBrake = !!podaci.bell_brake;
       osvjeziToggleGumb('lcdBacklight');
       osvjeziToggleGumb('pcLogging');
-      osvjeziToggleGumb('rs485Enabled');
       osvjeziToggleGumb('upsMode');
       osvjeziToggleGumb('bellBrake');
       document.getElementById('inertia1').value = podaci.inertia1_seconds ?? '';
@@ -1602,7 +1589,6 @@ static const char WEB_POSTAVKE_STRANICA[] PROGMEM = R"HTML(
       const tijelo = new URLSearchParams({
         lcd: stanje.lcdBacklight ? '1' : '0',
         log: stanje.pcLogging ? '1' : '0',
-        rs: stanje.rs485Enabled ? '1' : '0',
         ups: stanje.upsMode ? '1' : '0',
         koc: stanje.bellBrake ? '1' : '0',
         inr1: String(inertia1),
@@ -2551,7 +2537,7 @@ void konfigurirajWebPosluzitelj() {
       return;
     }
 
-    const char* obaveznaPolja[] = {"lcd", "log", "rs", "ups", "koc", "inr1", "inr2", "imp"};
+    const char* obaveznaPolja[] = {"lcd", "log", "ups", "koc", "inr1", "inr2", "imp"};
     for (size_t i = 0; i < (sizeof(obaveznaPolja) / sizeof(obaveznaPolja[0])); ++i) {
       if (!webPosluzitelj.hasArg(obaveznaPolja[i])) {
         webPosluzitelj.send(400, "text/plain", "Nedostaje jedno ili vise polja sustavskih postavki");
@@ -2561,7 +2547,6 @@ void konfigurirajWebPosluzitelj() {
 
     const String lcdArg = ocistiJednolinijskiTekst(webPosluzitelj.arg("lcd"), 1);
     const String logArg = ocistiJednolinijskiTekst(webPosluzitelj.arg("log"), 1);
-    const String rsArg = ocistiJednolinijskiTekst(webPosluzitelj.arg("rs"), 1);
     const String upsArg = ocistiJednolinijskiTekst(webPosluzitelj.arg("ups"), 1);
     const String kocArg = ocistiJednolinijskiTekst(webPosluzitelj.arg("koc"), 1);
     const String inr1Arg = ocistiJednolinijskiTekst(webPosluzitelj.arg("inr1"), 3);
@@ -2570,7 +2555,6 @@ void konfigurirajWebPosluzitelj() {
 
     if (!((lcdArg == "0" || lcdArg == "1") &&
           (logArg == "0" || logArg == "1") &&
-          (rsArg == "0" || rsArg == "1") &&
           (upsArg == "0" || upsArg == "1") &&
           (kocArg == "0" || kocArg == "1") &&
           jeDecimalniBrojString(inr1Arg) &&
@@ -2594,7 +2578,6 @@ void konfigurirajWebPosluzitelj() {
     const PostavkeOdgovorMegai status = posaljiSustavskePostavkeMegai(
         lcdArg == "1",
         logArg == "1",
-        rsArg == "1",
         upsArg == "1",
         kocArg == "1",
         static_cast<unsigned int>(inr1),

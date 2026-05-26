@@ -5,16 +5,16 @@
 #ifndef PODESAVANJA_PINY_H
 #define PODESAVANJA_PINY_H
 
-// ==================== RELAY CONTROL PINS ====================
-// Impulse relay pins for hand position control (K-minuta tracking)
-// 6-second pulses via ULN2803 optocoupler drivers to 5V relays
+// ==================== PINOVI RELEJA KAZALJKI I PLOCE ====================
+// Impulsni releji kazaljki prate K-minute toranjskog sata.
+// Svaki korak traje 6 sekundi preko ULN2803 izlaza prema 5 V relejima.
 
-#define PIN_RELEJ_PARNE_KAZALJKE      22  // Even relay (first phase)
-#define PIN_RELEJ_NEPARNE_KAZALJKE    23  // Odd relay (second phase)
+#define PIN_RELEJ_PARNE_KAZALJKE      22  // Parni relej kazaljki
+#define PIN_RELEJ_NEPARNE_KAZALJKE    23  // Neparni relej kazaljki
 
-// Impulse relay pins for rotating plate control (position tracking)
-#define PIN_RELEJ_PARNE_PLOCE         24  // Even relay for plate (first phase)
-#define PIN_RELEJ_NEPARNE_PLOCE       25  // Odd relay for plate (second phase)
+// Impulsni releji okretne ploce prate poziciju cavala.
+#define PIN_RELEJ_PARNE_PLOCE         24  // Parni relej ploce
+#define PIN_RELEJ_NEPARNE_PLOCE       25  // Neparni relej ploce
 
 // ==================== PINOVI ZVONA I CEKICA ====================
 // Toranjski sat koristi samo dva releja zvona.
@@ -34,17 +34,17 @@
 #define PIN_ULAZA_PLOCE_4             33  // Cavao 4
 #define PIN_ULAZA_PLOCE_5             34  // Cavao 5
 
-// ==================== TIME SYNCHRONIZATION INPUTS ====================
+// ==================== ULAZ SINKRONIZACIJE VREMENA ====================
 // RTC SQW ostaje jedini lokalni takt sinkronizacije vremena toranjskog sata.
 
 #define PIN_RTC_SQW                   2   // DS3231 SQW 1 Hz takt za precizno okidanje
 
-// ==================== I2C BUS ====================
-// I2C communication for RTC (DS3231) and vanjski FRAM/EEPROM spremnik
-// Arduino Mega I2C: SDA=20, SCL=21 (fixed pins)
+// ==================== I2C SABIRNICA ====================
+// I2C komunikacija za RTC (DS3231) i vanjski FRAM/EEPROM spremnik.
+// Arduino Mega I2C koristi fiksne pinove SDA=20 i SCL=21.
 
-#define PIN_SDA                       20  // I2C SDA - serial data
-#define PIN_SCL                       21  // I2C SCL - serial clock
+#define PIN_SDA                       20  // I2C SDA
+#define PIN_SCL                       21  // I2C SCL
 
 // ==================== LOKALNE TIPKE IZBORNIKA ====================
 // Lokalni LCD izbornik toranjskog sata koristi 6 direktnih tipki.
@@ -102,16 +102,16 @@
 
 #define PIN_RELEJ_NOCNE_RASVJETE      47  // Relej nocne rasvjete (HIGH=ukljuci)
 
-// ==================== MANUAL BELL TOGGLE INPUTS ====================
-// Fizicke sklopke na GND za rucno upravljanje zvonima toranjskog sata
+// ==================== RUCNE SKLOPKE ZVONA ====================
+// Fizicke sklopke na GND za rucno upravljanje zvonima toranjskog sata.
 
-#define PIN_BELL1_SWITCH              44  // Rucna sklopka za BELL 1 (LOW=ON)
-#define PIN_BELL2_SWITCH              45  // Rucna sklopka za BELL 2 (LOW=ON)
+#define PIN_BELL1_SWITCH              44  // Rucna sklopka za zvono 1 (LOW=ON)
+#define PIN_BELL2_SWITCH              45  // Rucna sklopka za zvono 2 (LOW=ON)
 
 // ==================== 433 MHZ DALJINSKI UPRAVLJAC ====================
 // Sirovi 433 MHz prijemnik SRX882 koristi jedan data izlaz prema prekidnom
-// pinu Mege. Firmware iz tog niza impulsa prepoznaje nauceni kod tipke C
-// za toggle slavljenja toranjskog sata.
+// pinu Mege. Firmware iz tog niza impulsa prepoznaje naucene kodove tipki
+// A/B/C/D za daljinsko upravljanje zvonima, slavljenjem i mrtvackim zvonom.
 
 #define PIN_DALJINSKI_433_DATA        3   // SRX882 DATA izlaz, prekidni ulaz za daljinski
 
@@ -128,22 +128,16 @@
 #define PIN_MRTVACKO_TIMER_JEDINICE_BIT2  A6  // BCD 4
 #define PIN_MRTVACKO_TIMER_JEDINICE_BIT3  A5  // BCD 8
 
-// ==================== SERIAL COMMUNICATION ====================
-// Arduino Mega provides 4 hardware serial ports (Serial, Serial1-3)
+// ==================== SERIJSKA KOMUNIKACIJA ====================
+// Arduino Mega ima 4 hardverska serijska porta (Serial, Serial1-3).
 
-// Serial0 (USB):  115200 baud - PC debugging/logging
-// Serial1:        aktivni RS485 transport toranjskog sata (Rx1=pin19, Tx1=pin18)
+// Serial0 (USB):  115200 baud - PC dijagnostika i logiranje
 // Serial3:        9600 baud   - vanjski ESP32 mrezni most (Rx3=pin15, Tx3=pin14)
-
-// RS485 ostaje dodatni transportni sloj za toranjski sat. Postojeci relejni
-// izlazi ostaju aktivni, a RS485 se uvodi nerazorno za kasnije slanje naredbi.
-#define PIN_RS485_SMJER              35  // DE/RE upravljanje transceiverom (HIGH=TX, LOW=RX)
-#define RS485_SERIJSKI_PORT          Serial1
 
 // Toranjski sat koristi ESP kao jedini aktivni mrezni most i bezicni API sloj.
 #define ESP_SERIJSKI_PORT            Serial3
 
-// All PIN assignments consolidated in this single header file
-// No duplicate definitions allowed in other source files
+// Sve definicije pinova ostaju objedinjene u ovoj datoteci.
+// Ne dodavati dvostruke definicije u druge module.
 
 #endif  // PODESAVANJA_PINY_H

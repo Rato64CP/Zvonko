@@ -1,6 +1,6 @@
 # 🔧 ZVONKO v. 1.0 - ESP firmware
 
-Engleska verzija: [README.md](README.md)
+Hrvatska verzija ove dokumentacije je kanonska za mrezni modul toranjskog sata.
 
 Ova podmapa sadrzi firmware za vanjski `ESP32` modul koji radi kao mrezni sloj toranjskog sata. `ESP` serijski suraduje s `Arduino Megom 2560` kroz `main/esp_serial.cpp`, ali ne preuzima vlasnistvo nad `RTC`-om, zvonima, cekicima, kazaljkama ni okretnom plocom.
 
@@ -62,7 +62,7 @@ Ova podmapa sadrzi firmware za vanjski `ESP32` modul koji radi kao mrezni sloj t
   - `BAT`
   - `Sunce`
   - `Blagdani`
-- `Sustav` ukljucuje `LCD svjetlo`, `Logiranje`, `RS485`, `UPS mod`, `Kocnicu zvona`, `INR1`, `INR2` i `Impuls cekica`
+- `Sustav` ukljucuje `LCD svjetlo`, `Logiranje`, `UPS mod`, `Kocnicu zvona`, `INR1`, `INR2` i `Impuls cekica`
 - `Stapici` ukljucuju trajanja `TR`, `TN`, `TS` i odgodu slavljenja `S`
 - `BAT` ukljucuje sate `od/do` i modove `OTK`, `S` i `M`
 - `BAT od/do` na webu znaci raspon u kojem je redovno otkucavanje dopusteno; izvan tog raspona `Mega` blokira samo otkucavanje kroz `main/postavke.cpp` i `main/otkucavanje.cpp`

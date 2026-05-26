@@ -1,6 +1,6 @@
 # 🔧 ZVONKO v. 1.0 - Mega firmware
 
-Engleska verzija: [README.md](README.md)
+Hrvatska verzija ove dokumentacije je kanonska za firmware toranjskog sata.
 
 Ova podmapa sadrzi glavni firmware projekta `ZVONKO v. 1.0` za `Arduino Mega 2560`. Mega je glavni kontroler toranjskog sata i jedino mjesto istine za mehaniku, postavke i recovery.
 
@@ -82,7 +82,7 @@ Ova podmapa sadrzi glavni firmware projekta `ZVONKO v. 1.0` za `Arduino Mega 256
 ## 🔄 Serijska komunikacija s ESP-om
 
 - `Mega` koristi `Serial3` za vanjski `ESP32` mrezni most
-- `Serial1` je aktivni `RS485` transportni sloj, dok komunikacija prema `ESP-u` ostaje na `Serial3`
+- komunikacija prema `ESP-u` ostaje na `Serial3`; `Serial1` vise nema aktivan transportni sloj
 - aktivni tokovi su `WIFI:`, `WIFIEN:`, `WIFISTATUS?`, `NTPCFG:`, `NTPREQ:SYNC`, `NTP:`, `CMD:`, `STATUS?`, `SETREQ:*` i `SETCFG:*` za skupine `SUSTAV`, `STAPICI`, `BAT`, `SUNCE`, `MISE`, `BLAGDANI_NEP` i `BLAGDANI_POM`
 - `NTPREQ:SYNC` sluzi za kontrolirani zahtjev prema `ESP-u` kad je mehanika toranjskog sata mirna
 - vanjski mrezni most vise ne salje `NTP:` po vlastitom rasporedu, nego odgovara na zahtjev `Mege`

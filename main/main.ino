@@ -24,7 +24,6 @@
 #include "mise_automatika.h"
 #include "pogrebne_skripte.h"
 #include "prekidac_tisine.h"
-#include "rs485_bridge.h"
 #include "ups_nadzor.h"
 #include "daljinski_433.h"
 
@@ -48,8 +47,7 @@ void inicijalizirajSigurnaPocetnaStanjaIzlaza() {
       PIN_LAMPICA_TIHI_REZIM,
       PIN_LAMPICA_SUNCE_JUTRO,
       PIN_LAMPICA_SUNCE_PODNE,
-      PIN_LAMPICA_SUNCE_VECER,
-      PIN_RS485_SMJER
+      PIN_LAMPICA_SUNCE_VECER
   };
 
   for (uint8_t i = 0; i < (sizeof(izlazniPinovi) / sizeof(izlazniPinovi[0])); ++i) {
@@ -67,7 +65,6 @@ void setup() {
   pripremiI2CSabirnicuSigurno();
   inicijalizirajLCD();
   inicijalizirajPCSerijsku();
-  inicijalizirajRS485();
 
   posaljiPCLog(VanjskiEEPROM::inicijaliziraj()
                    ? F("EEPROM: vanjski EEPROM dostupan")
@@ -122,7 +119,6 @@ void loop() {
   }
 
   obradiESPSerijskuKomunikaciju();
-  obradiRS485();
   upravljajMenuSistemom();
   provjeriTipke();
   osvjeziPrekidacTisine();

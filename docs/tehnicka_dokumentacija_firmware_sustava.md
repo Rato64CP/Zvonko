@@ -53,7 +53,6 @@ Najvaznije skupine pinova su:
 | `433 MHz` | `3` | `SRX882` prekidni ulaz za daljinski prijemnik |
 | Lokalne tipke izbornika | `7-12` | `GORE`, `DOLJE`, `LIJEVO`, `DESNO`, `DA`, `NE` |
 | `ESP32` most | `14-15` | `Serial3` prema vanjskom mreznom mostu |
-| `RS485` | `18-19`, `35` | Aktivni `RS485` transport i upravljanje smjerom |
 | `I2C` | `20-21` | `DS3231 RTC`, LCD i vanjski EEPROM/FRAM |
 | Releji kazaljki, ploce, zvona i cekica | `22-29` | Glavni izlazi mehanike toranjskog sata |
 | Ulazi ploce | `30-34` | Citanje cavala okretne ploce |
@@ -388,7 +387,7 @@ Meni `Sustav` je sada zgusnut u dvije LCD stranice kako bi bilo manje hoda kroz 
 - stranica `Impuls/inercija` prikazuje `IN1`, `IN2` i `IMPULS`
 
 U tom rasporedu:
-- `LIJEVO/DESNO` pomice aktivno polje kroz svih 8 sustavskih postavki
+- `LIJEVO/DESNO` pomice aktivno polje kroz svih 7 sustavskih postavki
 - `GORE/DOLJE` mijenja vrijednost aktivnog polja
 - `DA` sprema sve izmjene
 - `NE` izlazi bez spremanja
@@ -396,7 +395,6 @@ U tom rasporedu:
 Obuhvacene postavke su:
 - `LCD svjetlo`
 - `Logiranje`
-- `RS485`
 - `UPS mod`
 - `K` - koristenje kocnice zvona
 - `INR1` - vrijeme smirivanja za `Zvono 1`

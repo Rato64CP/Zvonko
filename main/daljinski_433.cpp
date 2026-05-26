@@ -15,9 +15,8 @@ namespace {
 
 const unsigned long DALJINSKI_433_MIN_TRAJANJE_IMPULSA_US = 80UL;
 const unsigned long DALJINSKI_433_GAP_OKVIRA_US = 5000UL;
-const unsigned long DALJINSKI_433_MAKS_RAZMAK_PONAVLJANJA_SLAVLJENJE_MS = 350UL;
-const unsigned long DALJINSKI_433_MAKS_RAZMAK_PONAVLJANJA_ZVONO_I_MRTVACKO_MS = 500UL;
 const unsigned long DALJINSKI_433_PROZOR_MIRA_NAKON_PRIHVATA_MS = 200UL;
+const unsigned long DALJINSKI_433_MIN_MIR_ZA_NOVI_PRITISAK_MS = 650UL;
 const unsigned long DALJINSKI_433_MIN_RAZMAK_LOGA_DEKODIRANJA_MS = 1000UL;
 const uint8_t DALJINSKI_433_EV1527_BROJ_BITOVA = 24;
 const uint8_t DALJINSKI_433_MAKS_IMPULSA = 80;
@@ -32,8 +31,8 @@ volatile uint8_t brojSirovihImpulsa = 0;
 volatile unsigned long zadnjiRubUs = 0UL;
 volatile bool okvirSpremanZaObradu = false;
 bool daljinski433Inicijaliziran = false;
-uint32_t zadnjiPrihvaceniKod = 0UL;
-unsigned long zadnjePrihvacanjeKodaMs = 0UL;
+uint32_t kodAktivnogPritiska = 0UL;
+unsigned long zadnjiOkvirAktivnogPritiskaMs = 0UL;
 unsigned long ignorirajOkvireDoMs = 0UL;
 unsigned long zadnjiLogNeuspjelogDekodiranjaMs = 0UL;
 
@@ -71,18 +70,6 @@ bool jeUnutarTolerancije(unsigned long vrijednost, unsigned long cilj, unsigned 
   const unsigned long donjaGranica = (tolerancija > cilj) ? 0UL : (cilj - tolerancija);
   const unsigned long gornjaGranica = cilj + tolerancija;
   return vrijednost >= donjaGranica && vrijednost <= gornjaGranica;
-}
-
-unsigned long dohvatiAntiRepeatProzorZaKod(uint32_t kod) {
-  if (kod == DALJINSKI_433_KOD_TIPKE_C) {
-    return DALJINSKI_433_MAKS_RAZMAK_PONAVLJANJA_SLAVLJENJE_MS;
-  }
-  if (kod == DALJINSKI_433_KOD_TIPKE_A ||
-      kod == DALJINSKI_433_KOD_TIPKE_B ||
-      kod == DALJINSKI_433_KOD_TIPKE_D) {
-    return DALJINSKI_433_MAKS_RAZMAK_PONAVLJANJA_ZVONO_I_MRTVACKO_MS;
-  }
-  return DALJINSKI_433_MAKS_RAZMAK_PONAVLJANJA_ZVONO_I_MRTVACKO_MS;
 }
 
 bool dekodirajEv1527PodatkeOdIndeksa(const uint16_t* impulsi,
@@ -178,14 +165,20 @@ bool dekodirajEv1527Okvir(const uint16_t* impulsi,
 
 void obradiKodDaljinskog(uint32_t kod) {
   const unsigned long sadaMs = millis();
-  const unsigned long antiRepeatProzorMs = dohvatiAntiRepeatProzorZaKod(kod);
-  if (kod == zadnjiPrihvaceniKod &&
-      (sadaMs - zadnjePrihvacanjeKodaMs) < antiRepeatProzorMs) {
+  // Jedan fizicki pritisak daljinskog salje vise jednakih EV1527 okvira.
+  // Isti kod prihvacamo ponovno tek nakon kratkog mira bez ponavljanja.
+  if (kodAktivnogPritiska != 0UL &&
+      (sadaMs - zadnjiOkvirAktivnogPritiskaMs) >= DALJINSKI_433_MIN_MIR_ZA_NOVI_PRITISAK_MS) {
+    kodAktivnogPritiska = 0UL;
+  }
+
+  if (kod == kodAktivnogPritiska) {
+    zadnjiOkvirAktivnogPritiskaMs = sadaMs;
     return;
   }
 
-  zadnjiPrihvaceniKod = kod;
-  zadnjePrihvacanjeKodaMs = sadaMs;
+  kodAktivnogPritiska = kod;
+  zadnjiOkvirAktivnogPritiskaMs = sadaMs;
   ignorirajOkvireDoMs = sadaMs + DALJINSKI_433_PROZOR_MIRA_NAKON_PRIHVATA_MS;
 
   if (kod == DALJINSKI_433_KOD_TIPKE_A) {
@@ -241,8 +234,8 @@ void inicijalizirajDaljinski433() {
   brojSirovihImpulsa = 0;
   zadnjiRubUs = micros();
   okvirSpremanZaObradu = false;
-  zadnjiPrihvaceniKod = 0UL;
-  zadnjePrihvacanjeKodaMs = 0UL;
+  kodAktivnogPritiska = 0UL;
+  zadnjiOkvirAktivnogPritiskaMs = 0UL;
   ignorirajOkvireDoMs = 0UL;
   zadnjiLogNeuspjelogDekodiranjaMs = 0UL;
 
