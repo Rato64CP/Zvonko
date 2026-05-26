@@ -16,6 +16,7 @@ static const uint8_t BROJ_ZVONA_MAX = 2;
 static const uint8_t BROJ_RUCNIH_SKLOPKI_ZVONA = 2;
 static const unsigned long INTERVAL_TREPTANJA_LAMPICE_INERCIJE_MS = 500UL;
 static const unsigned long MAKS_TRAJANJE_RUCNE_SKLOPKE_ZVONA_MS = 30UL * 60UL * 1000UL;
+static const unsigned long MAKS_TRAJANJE_TOGGLE_ZVONA_MS = 30UL * 60UL * 1000UL;
 static const unsigned long MIN_RAD_ZA_PUNU_INERCIJU_BEZ_KOCNICE_MS = 20000UL;
 static const unsigned long PROZOR_CEKANJA_DRUGOG_GASENJA_BEZ_KOCNICE_MS = 2000UL;
 
@@ -400,6 +401,33 @@ static void obradiSigurnosniTimeoutRucnihSklopkiZvona(unsigned long sadaMs) {
   }
 }
 
+static void obradiSigurnosniTimeoutToggleZvona(unsigned long sadaMs) {
+  for (uint8_t i = 0; i < BROJ_ZVONA_MAX; ++i) {
+    const bool rucniOverride =
+        (i < BROJ_RUCNIH_SKLOPKI_ZVONA) ? manualnoUpravljanje.override_aktivan[i] : false;
+    if (!zvona.aktivan[i] ||
+        rucniOverride ||
+        zvona.duration_ms[i] != 0 ||
+        zvona.start_ms[i] == 0UL) {
+      continue;
+    }
+
+    if ((sadaMs - zvona.start_ms[i]) < MAKS_TRAJANJE_TOGGLE_ZVONA_MS) {
+      continue;
+    }
+
+    iskljuciZvono(i + 1);
+
+    char log[96];
+    snprintf_P(log,
+               sizeof(log),
+               PSTR("Zvono%d: sigurnosno gasenje toggle ukljucenja nakon %lu min"),
+               i + 1,
+               static_cast<unsigned long>(MAKS_TRAJANJE_TOGGLE_ZVONA_MS / 60000UL));
+    posaljiPCLog(log);
+  }
+}
+
 // ==================== PUBLIC API ====================
 
 void izracunajTrajanjaDvajuZvonaZaSinkroniZavrsetak(unsigned long baznoTrajanjeMs,
@@ -739,6 +767,7 @@ void upravljajZvonom() {
 
   obradiCekanjeSinkroniziranogGasenja(sadaMs);
   obradiSigurnosniTimeoutRucnihSklopkiZvona(sadaMs);
+  obradiSigurnosniTimeoutToggleZvona(sadaMs);
 
   for (uint8_t i = 0; i < BROJ_RUCNIH_SKLOPKI_ZVONA; i++) {
     if (obradiDebouncedInput(PINOVI_RUCNIH_SKLOPKI[i], 30, &novoStanje)) {
