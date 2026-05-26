@@ -1,7 +1,5 @@
 # 🔧 ZVONKO v. 1.0 - ESP firmware
 
-Hrvatska verzija ove dokumentacije je kanonska za mrezni modul toranjskog sata.
-
 Ova podmapa sadrzi firmware za vanjski `ESP32` modul koji radi kao mrezni sloj toranjskog sata. `ESP` serijski suraduje s `Arduino Megom 2560` kroz `main/esp_serial.cpp`, ali ne preuzima vlasnistvo nad `RTC`-om, zvonima, cekicima, kazaljkama ni okretnom plocom.
 
 ## ✨ Uloga ESP modula

@@ -1,7 +1,5 @@
 # 🔧 ZVONKO v. 1.0 - Mega firmware
 
-Hrvatska verzija ove dokumentacije je kanonska za firmware toranjskog sata.
-
 Ova podmapa sadrzi glavni firmware projekta `ZVONKO v. 1.0` za `Arduino Mega 2560`. Mega je glavni kontroler toranjskog sata i jedino mjesto istine za mehaniku, postavke i recovery.
 
 ## ✨ Odgovornosti Mege
