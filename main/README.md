@@ -86,6 +86,7 @@ Ova podmapa sadrzi glavni firmware projekta `ZVONKO v. 1.0` za `Arduino Mega 256
 - vanjski mrezni most vise ne salje `NTP:` po vlastitom rasporedu, nego odgovara na zahtjev `Mege`
 - prvi `NTP` nakon restarta ili `WiFi` reconnecta `ESP` potvrduje drugim uzorkom prije nego sto ga `Mega` prihvati za toranjski sat
 - prihvaceni `NTP` zapis i start redovnog otkucavanja poravnavaju se na `RTC SQW` granicu sekunde kad je dostupna
+- `Mega` pri bootu moze offline prepoznati propusteni `DST` prijelaz iz `DS3231` vremena i spremljenog `DST` statusa te korigirati `RTC` prije pokretanja kazaljki i okretne ploce
 - `SETREQ:SUSTAV`, `SETREQ:STAPICI`, `SETREQ:BAT`, `SETREQ:SUNCE`, `SETREQ:MISE`, `SETREQ:BLAGDANI_NEP` i `SETREQ:BLAGDANI_POM` traze trenutno stanje pojedine web skupine iz `main/postavke.*`
 - `SETCFG:SUSTAV|...`, `SETCFG:STAPICI|...`, `SETCFG:BAT|...`, `SETCFG:SUNCE|...`, `SETCFG:MISE|...`, `SETCFG:BLAGDANI_NEP|...` i `SETCFG:BLAGDANI_POM|...` salju novi puni paket odgovarajuce skupine prema `Megi`
 

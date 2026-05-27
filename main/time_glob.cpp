@@ -59,6 +59,7 @@ static unsigned long rtcZadnjiPokusajReinicijalizacijeMs = 0;
 static bool rtcIzlazniFailSafeAktivan = false;
 static bool dstAktivan = false;
 static bool dstStatusUcitan = false;
+static bool dstStatusProcitanIzTrajnePohrane = false;
 static bool vrijemePotvrdjenoZaAutomatiku = false;
 static bool rtcDegradiraniNacinAktivan = false;
 static bool ntpSinkronizacijaZakazana = false;
@@ -446,18 +447,54 @@ static void spremiDSTStatus() {
 
 static void ucitajDSTStatus() {
   EepromLayout::DSTStatus stanje{};
+  dstStatusProcitanIzTrajnePohrane = false;
   if (WearLeveling::ucitaj(EepromLayout::BAZA_DST_STATUS,
                            EepromLayout::SLOTOVI_DST_STATUS,
                            stanje) &&
       jeDSTStatusValjan(stanje)) {
     dstAktivan = stanje.dstAktivan != 0;
     dstStatusUcitan = true;
+    dstStatusProcitanIzTrajnePohrane = true;
     return;
   }
 
   dstAktivan = izracunajDSTIzKalendara(trenutnoVrijeme);
   dstStatusUcitan = true;
   spremiDSTStatus();
+}
+
+static void uskladiPropusteniDSTPrijelazNakonBoota() {
+  if (!rtcBaterijaOk ||
+      !dstStatusProcitanIzTrajnePohrane ||
+      !jeVrijemeURasponuPouzdanosti(trenutnoVrijeme)) {
+    return;
+  }
+
+  const bool kalendarskiDST = izracunajDSTIzKalendara(trenutnoVrijeme);
+  if (kalendarskiDST == dstAktivan) {
+    return;
+  }
+
+  const uint32_t trenutnoUnix = trenutnoVrijeme.unixtime();
+  if (!kalendarskiDST && trenutnoUnix < 3600UL) {
+    return;
+  }
+
+  const DateTime korigiranoVrijeme(
+      kalendarskiDST ? (trenutnoUnix + 3600UL) : (trenutnoUnix - 3600UL));
+  if (!pokusajUpisatiVrijemeURtc(
+          korigiranoVrijeme,
+          F("RTC: neuspjela offline DST korekcija, cekam NTP ili rucni unos"))) {
+    return;
+  }
+
+  trenutnoVrijeme = korigiranoVrijeme;
+  dstAktivan = kalendarskiDST;
+  spremiDSTStatus();
+
+  posaljiPCLog(kalendarskiDST
+                   ? F("DST: offline korekcija propustenog prijelaza na CEST (+60 min)")
+                   : F("DST: offline korekcija propustenog prijelaza na CET (-60 min)"));
 }
 
 static bool trebaProljetniPomak(const DateTime& vrijeme) {
@@ -717,6 +754,7 @@ void inicijalizirajRTC() {
   rtcSqwZadnjiTickMs = millis();
   posaljiPCLog(F("RTC: pocinjem ucitavanje DST statusa"));
   ucitajDSTStatus();
+  uskladiPropusteniDSTPrijelazNakonBoota();
   posaljiPCLog(F("RTC: DST status ucitan"));
   posaljiPCLog(F("RTC: pocinjem ucitavanje zadnje sinkronizacije"));
   ucitajZadnjuSinkronizaciju();
