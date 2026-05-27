@@ -173,8 +173,15 @@ void obradiKorak(EepromLayout::UnifiedMotionState& stanje) {
   if (stanje.plate_phase == FAZA_PRVI_RELEJ && istekPoSqw) {
     stanje.plate_phase = FAZA_DRUGI_RELEJ;
     pocetakFazeRtcTick = rtcTick;
+    if (!UnifiedMotionStateStore::spremiAkoPromjena(stanje)) {
+      stanje.plate_phase = FAZA_STABILNO;
+      pocetakFazeRtcTick = 0;
+      digitalWrite(PIN_RELEJ_PARNE_PLOCE, LOW);
+      digitalWrite(PIN_RELEJ_NEPARNE_PLOCE, LOW);
+      posaljiPCLog(F("Ploca: EEPROM/FRAM zapis faze 2 nije potvrden, gasim releje"));
+      return;
+    }
     aktivirajRelejePoFazi(stanje);
-    UnifiedMotionStateStore::spremiAkoPromjena(stanje);
     posaljiPCLog(F("Ploca: faza 2 po RTC SQW taktu"));
     UnifiedMotionStateStore::logirajStanje(stanje);
     return;
@@ -218,8 +225,15 @@ void pokreniKorakAkoTreba(EepromLayout::UnifiedMotionState& stanje) {
 
   stanje.plate_phase = FAZA_PRVI_RELEJ;
   pocetakFazeRtcTick = rtcTick;
+  if (!UnifiedMotionStateStore::spremiAkoPromjena(stanje)) {
+    stanje.plate_phase = FAZA_STABILNO;
+    pocetakFazeRtcTick = 0;
+    digitalWrite(PIN_RELEJ_PARNE_PLOCE, LOW);
+    digitalWrite(PIN_RELEJ_NEPARNE_PLOCE, LOW);
+    posaljiPCLog(F("Ploca: EEPROM/FRAM zapis starta nije potvrden, preskacem impuls releja"));
+    return;
+  }
   aktivirajRelejePoFazi(stanje);
-  UnifiedMotionStateStore::spremiAkoPromjena(stanje);
   posaljiPCLog(F("Ploca: start po RTC SQW taktu"));
   UnifiedMotionStateStore::logirajStanje(stanje);
 }

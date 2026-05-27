@@ -95,7 +95,7 @@ Ova podmapa sadrzi glavni firmware projekta `ZVONKO v. 1.0` za `Arduino Mega 256
 - iako je fizicki kapacitet veci, toranjski sat zadrzava postojeci kompatibilni raspored unutar prvih `4096 B`
 - `UnifiedMotionState` koristi `24` rotirajuca slota za kazaljke i okretnu plocu
 - svaki zapis `UnifiedMotionState` nosi checksum kako bi se preskocio korumpirani slot nakon prekida napajanja usred upisa
-- zapis zadnje sinkronizacije vremena ima vlastiti checksum i kompatibilan legacy fallback
+- zapis zadnje sinkronizacije vremena ima vlastiti checksum
 - `power_recovery.*` vraca kazaljke i plocu u dosljedno stanje nakon restarta
 - watchdog resetovi se pamte u zasebnom EEPROM bloku i tek ponovljeni watchdog resetovi bez power-loss oznake vode u `safe mode`
 - `safe mode` blokira mehaniku i prikazuje `SUSTAV ZAKLJUCAN / PREVISE RESETA` dok operater ne drzi `ENT / SELECT` `5 s`

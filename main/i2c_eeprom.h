@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 // Adapter za vanjski I2C spremnik na RTC plocici.
 // Toranjski sat podrzava i `24C32 EEPROM` i `FM24W256 FRAM`,
@@ -9,6 +10,9 @@ namespace VanjskiEEPROM {
 
 // Inicijaliziraj I2C sabirnicu i provjeri dostupnost vanjske memorije.
 bool inicijaliziraj();
+
+// Vraca aktivnu I2C adresu vanjske memorije ili 0 ako nije pronadena.
+uint8_t dohvatiAktivnuAdresu();
 
 // Citanje sirovih bajtova s zadane adrese.
 bool procitaj(int adresa, void* odrediste, size_t duljina);

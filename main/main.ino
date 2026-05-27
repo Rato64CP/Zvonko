@@ -1,5 +1,7 @@
 // main.ino - Glavni orkestrator sustava toranjskog sata
 #include <Arduino.h>
+#include <avr/pgmspace.h>
+#include <stdio.h>
 
 #include "lcd_display.h"
 #include "i2c_bus.h"
@@ -66,9 +68,16 @@ void setup() {
   inicijalizirajLCD();
   inicijalizirajPCSerijsku();
 
-  posaljiPCLog(VanjskiEEPROM::inicijaliziraj()
-                   ? F("EEPROM: vanjski EEPROM dostupan")
-                   : F("EEPROM: vanjski EEPROM nije dostupan"));
+  if (VanjskiEEPROM::inicijaliziraj()) {
+    char log[48];
+    snprintf_P(log,
+               sizeof(log),
+               PSTR("EEPROM: vanjski spremnik dostupan na 0x%02X"),
+               VanjskiEEPROM::dohvatiAktivnuAdresu());
+    posaljiPCLog(log);
+  } else {
+    posaljiPCLog(F("EEPROM: vanjski EEPROM/FRAM nije dostupan"));
+  }
   inicijalizirajRTC();
   ucitajPostavke();
   primijeniLCDPozadinskoOsvjetljenje(jeLCDPozadinskoOsvjetljenjeUkljuceno());

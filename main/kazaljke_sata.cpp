@@ -174,8 +174,15 @@ void pokreniKorakAkoTreba(EepromLayout::UnifiedMotionState& stanje) {
   stanje.hand_active = HAND_AKTIVNO;
   stanje.hand_relay = odrediRelejKazaljki(stanje);
   aktivniKorakStartRtcTick = rtcTick;
+  if (!UnifiedMotionStateStore::spremiAkoPromjena(stanje)) {
+    stanje.hand_active = HAND_NEAKTIVNO;
+    stanje.hand_relay = HAND_RELEJ_NIJEDAN;
+    aktivniKorakStartRtcTick = 0;
+    ugasiRelejeKazaljki();
+    posaljiPCLog(F("Kazaljke: EEPROM/FRAM zapis nije potvrden, preskacem impuls releja"));
+    return;
+  }
   aktivirajRelejeKazaljki(stanje);
-  UnifiedMotionStateStore::spremiAkoPromjena(stanje);
   const EepromLayout::UnifiedMotionState potvrdenoStanje = UnifiedMotionStateStore::dohvatiIliInicijaliziraj();
   if (potvrdenoStanje.hand_active == HAND_AKTIVNO &&
       potvrdenoStanje.hand_relay == stanje.hand_relay) {
@@ -222,10 +229,6 @@ void inicijalizirajKazaljke() {
   rucnaBlokadaKazaljki = false;
   UnifiedMotionStateStore::logirajStanje(stanje);
   posaljiPCLog(F("Kazaljke: inicijalizirane kroz jedinstveni model stanja"));
-}
-
-void upravljajKazaljkama() {
-  upravljajKorekcijomKazaljki();
 }
 
 void upravljajKorekcijomKazaljki() {

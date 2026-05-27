@@ -392,25 +392,6 @@ static bool jeZadnjaSinkronizacijaValjana(const EepromLayout::ZadnjaSinkronizaci
          stanje.checksum == izracunajChecksumZadnjeSinkronizacije(stanje);
 }
 
-struct LegacyZadnjaSinkronizacija {
-  int izvor;
-  uint32_t timestamp;
-};
-
-static bool ucitajLegacyZadnjuSinkronizaciju(LegacyZadnjaSinkronizacija& stanje) {
-  // Legacy fallback ostaje kako bi toranjski sat procitao stare 6-bajtne zapise
-  // zadnje sinkronizacije i potom ih migrirao na checksum format bez gubitka stanja.
-  if (!WearLeveling::ucitaj(EepromLayout::BAZA_ZADNJA_SINKRONIZACIJA,
-                            EepromLayout::SLOTOVI_ZADNJA_SINKRONIZACIJA,
-                            stanje)) {
-    return false;
-  }
-
-  return stanje.izvor == IZ_RTC ||
-         stanje.izvor == IZ_NTP ||
-         stanje.izvor == IZ_MAN;
-}
-
 static uint8_t zadnjaNedjeljaUMjesecu(int godina, uint8_t mjesec) {
   DateTime zadnjiDan(godina, mjesec + 1, 1, 0, 0, 0);
   zadnjiDan = DateTime(zadnjiDan.unixtime() - 86400UL);
@@ -528,24 +509,11 @@ static void obradiAutomatskiDST() {
 
 static void ucitajZadnjuSinkronizaciju() {
   EepromLayout::ZadnjaSinkronizacija zs{};
-  bool imaValjaniZapis = false;
-  bool legacyMigracija = false;
-
-  if (WearLeveling::ucitaj(EepromLayout::BAZA_ZADNJA_SINKRONIZACIJA,
+  const bool imaValjaniZapis =
+      WearLeveling::ucitaj(EepromLayout::BAZA_ZADNJA_SINKRONIZACIJA,
                            EepromLayout::SLOTOVI_ZADNJA_SINKRONIZACIJA,
                            zs) &&
-      jeZadnjaSinkronizacijaValjana(zs)) {
-    imaValjaniZapis = true;
-  } else {
-    LegacyZadnjaSinkronizacija legacy{};
-    if (ucitajLegacyZadnjuSinkronizaciju(legacy)) {
-      zs.izvor = static_cast<uint8_t>(legacy.izvor);
-      zs.timestamp = legacy.timestamp;
-      zs.checksum = izracunajChecksumZadnjeSinkronizacije(zs);
-      imaValjaniZapis = true;
-      legacyMigracija = true;
-    }
-  }
+      jeZadnjaSinkronizacijaValjana(zs);
 
   if (imaValjaniZapis) {
     zadnjaSinkronizacija = DateTime(zs.timestamp);
@@ -558,13 +526,6 @@ static void ucitajZadnjuSinkronizaciju() {
       zadnjiPotvrdeniIzvor = IZ_NTP;
     } else {
       zadnjiPotvrdeniIzvor = IZ_RTC;
-    }
-
-    if (legacyMigracija && !jeEepromDegradiraniNacinAktivan()) {
-      WearLeveling::spremi(EepromLayout::BAZA_ZADNJA_SINKRONIZACIJA,
-                           EepromLayout::SLOTOVI_ZADNJA_SINKRONIZACIJA,
-                           zs);
-      posaljiPCLog(F("Vrijeme: migriran legacy zapis zadnje sinkronizacije"));
     }
   } else {
     zadnjaSinkronizacija = DateTime((uint32_t)0);

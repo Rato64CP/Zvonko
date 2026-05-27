@@ -4,7 +4,6 @@
 #include <RTClib.h>
 
 void inicijalizirajKazaljke();
-void upravljajKazaljkama();
 void upravljajKorekcijomKazaljki();
 void postaviTrenutniPolozajKazaljki(int trenutnaMinuta);
 bool suKazaljkeUSinkronu();

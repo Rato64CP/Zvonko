@@ -246,6 +246,13 @@ bool inicijaliziraj() {
   return inicijalizirajUnutarnje(false);
 }
 
+uint8_t dohvatiAktivnuAdresu() {
+  if (!inicijalizirajUnutarnje(false) && !inicijalizirajUnutarnje(true)) {
+    return 0;
+  }
+  return aktivnaAdresaMemorije;
+}
+
 bool procitaj(int adresa, void* odrediste, size_t duljina) {
   if (odrediste == nullptr || !jeUnutarOpsega(adresa, duljina)) {
     return false;

@@ -201,16 +201,16 @@ EepromLayout::UnifiedMotionState dohvatiIliInicijaliziraj() {
   return stanje;
 }
 
-void spremiAkoPromjena(const EepromLayout::UnifiedMotionState& stanje) {
+bool spremiAkoPromjena(const EepromLayout::UnifiedMotionState& stanje) {
   if (cacheInicijaliziran && jednakoLogickoStanje(cacheStanje, stanje)) {
-    return;
+    return true;
   }
 
   EepromLayout::UnifiedMotionState trenutno{};
   int trenutniSlot = -1;
   if (!cacheInicijaliziran && ucitaj(trenutno) &&
       jednakoLogickoStanje(trenutno, stanje)) {
-    return;
+    return true;
   }
 
   if (!cacheInicijaliziran) {
@@ -232,11 +232,12 @@ void spremiAkoPromjena(const EepromLayout::UnifiedMotionState& stanje) {
   const int sljedeciSlot =
       (trenutniSlot >= 0) ? ((trenutniSlot + 1) % EepromLayout::SLOTOVI_UNIFIED_STANJE) : 0;
   if (!zapisiDirektnoSlot(sljedeciSlot, stanjeZaSpremanje)) {
-    return;
+    return false;
   }
   cacheStanje = stanjeZaSpremanje;
   cacheInicijaliziran = true;
   cacheSlot = sljedeciSlot;
+  return true;
 }
 
 void logirajStanje(const EepromLayout::UnifiedMotionState& stanje) {
