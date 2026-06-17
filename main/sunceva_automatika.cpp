@@ -10,6 +10,8 @@
 #include "time_glob.h"
 #include "zvonjenje.h"
 #include "slavljenje_mrtvacko.h"
+#include "lcd_display.h"
+#include "flash_text_utils.h"
 #include "pc_serial.h"
 #include "prekidac_tisine.h"
 #include "debouncing.h"
@@ -65,11 +67,15 @@ static bool nocnaRasvjetaUkljucena = false;
 static int32_t zadnjaSirinaE5 = 0x7FFFFFFFL;
 static int32_t zadnjaDuzinaE5 = 0x7FFFFFFFL;
 static uint8_t zadnjaMaskaDogadaja = 0xFF;
+static uint8_t zadnjaMaskaRucnihVremena = 0xFF;
 static uint8_t zadnjaZvona[SUNCEVI_DOGADAJ_BROJ] = {0, 0, 0};
 static int16_t zadnjeOdgode[SUNCEVI_DOGADAJ_BROJ] = {0, 0, 0};
+static int zadnjeRucneMinute[SUNCEVI_DOGADAJ_BROJ] = {-1, -1, -1};
 static bool aktivnoSuncevoZvonjenje[SUNCEVI_DOGADAJ_BROJ] = {false, false, false};
 static uint8_t aktivnoSuncevoZvono[SUNCEVI_DOGADAJ_BROJ] = {0, 0, 0};
 static unsigned long krajSuncevogZvonjenjaMs[SUNCEVI_DOGADAJ_BROJ] = {0, 0, 0};
+
+static void osigurajDnevniRaspored(const DateTime& sada);
 
 static void ponistiSuncevaZvonjenjaISlavljenjaZbogUPSModa() {
   zakazanoZvonjenje.aktivno = false;
@@ -252,29 +258,39 @@ static bool jeKonfiguracijaPromijenjena() {
   }
 
   uint8_t maska = 0;
+  uint8_t maskaRucnihVremena = 0;
   for (uint8_t i = 0; i < SUNCEVI_DOGADAJ_BROJ; ++i) {
     if (jeSuncevDogadajOmogucen(i)) {
       maska |= static_cast<uint8_t>(1U << i);
     }
+    if (jeRucnoVrijemeSuncevogDogadajaOmoguceno(i)) {
+      maskaRucnihVremena |= static_cast<uint8_t>(1U << i);
+    }
     if (zadnjaZvona[i] != dohvatiZvonoZaSuncevDogadaj(i) ||
-        zadnjeOdgode[i] != dohvatiOdgoduSuncevogDogadajaMin(i)) {
+        zadnjeOdgode[i] != dohvatiOdgoduSuncevogDogadajaMin(i) ||
+        zadnjeRucneMinute[i] != dohvatiRucnoVrijemeSuncevogDogadajaMin(i)) {
       return true;
     }
   }
 
-  return zadnjaMaskaDogadaja != maska;
+  return zadnjaMaskaDogadaja != maska || zadnjaMaskaRucnihVremena != maskaRucnihVremena;
 }
 
 static void zapamtiKonfiguraciju() {
   zadnjaSirinaE5 = SUNCEVA_LOKACIJA_SIRINA_E5;
   zadnjaDuzinaE5 = SUNCEVA_LOKACIJA_DUZINA_E5;
   zadnjaMaskaDogadaja = 0;
+  zadnjaMaskaRucnihVremena = 0;
   for (uint8_t i = 0; i < SUNCEVI_DOGADAJ_BROJ; ++i) {
     if (jeSuncevDogadajOmogucen(i)) {
       zadnjaMaskaDogadaja |= static_cast<uint8_t>(1U << i);
     }
+    if (jeRucnoVrijemeSuncevogDogadajaOmoguceno(i)) {
+      zadnjaMaskaRucnihVremena |= static_cast<uint8_t>(1U << i);
+    }
     zadnjaZvona[i] = dohvatiZvonoZaSuncevDogadaj(i);
     zadnjeOdgode[i] = static_cast<int16_t>(dohvatiOdgoduSuncevogDogadajaMin(i));
+    zadnjeRucneMinute[i] = dohvatiRucnoVrijemeSuncevogDogadajaMin(i);
   }
 }
 
@@ -468,6 +484,38 @@ static void osvjeziLampiceSunceveAutomatike() {
   }
 }
 
+static const char* dohvatiLCDNaslovSuncevogDogadaja(uint8_t dogadaj) {
+  if (dogadaj == SUNCEVI_DOGADAJ_JUTRO) {
+    return "ZDRAVOM. JUTRO";
+  }
+  if (dogadaj == SUNCEVI_DOGADAJ_PODNE) {
+    return "PODNEVNO ZVONO";
+  }
+  return "ZDRAVOM. VECER";
+}
+
+static void prikaziLCDPotvrduTipkeSuncevogDogadaja(uint8_t dogadaj, bool ukljuceno) {
+  char redak2[17];
+  if (ukljuceno) {
+    const DateTime sada = dohvatiTrenutnoVrijeme();
+    osigurajDnevniRaspored(sada);
+    const int minute = (raspored.valjano && dogadaj < SUNCEVI_DOGADAJ_BROJ)
+        ? raspored.minute[dogadaj]
+        : -1;
+    if (minute >= 0) {
+      snprintf_P(redak2, sizeof(redak2), PSTR("%02d:%02d"), minute / 60, minute % 60);
+    } else {
+      FlashTekst::kopirajLiteral(redak2, sizeof(redak2), PSTR("--:--"));
+    }
+  } else if (dogadaj == SUNCEVI_DOGADAJ_PODNE) {
+    FlashTekst::kopirajLiteral(redak2, sizeof(redak2), PSTR("PODNE OFF"));
+  } else {
+    FlashTekst::kopirajLiteral(redak2, sizeof(redak2), PSTR("ZDRAVOMARIJA OFF"));
+  }
+
+  prikaziPrivremenuPoruku(dohvatiLCDNaslovSuncevogDogadaja(dogadaj), redak2, 5000UL);
+}
+
 static void prebaciRucnoUpravljanjeSuncevimDogadajem(uint8_t dogadaj) {
   if (!jeRucnoUpravljivSuncevDogadaj(dogadaj)) {
     return;
@@ -478,6 +526,7 @@ static void prebaciRucnoUpravljanjeSuncevimDogadajem(uint8_t dogadaj) {
                        novoStanje,
                        dohvatiZvonoZaSuncevDogadaj(dogadaj),
                        dohvatiOdgoduSuncevogDogadajaMin(dogadaj));
+  prikaziLCDPotvrduTipkeSuncevogDogadaja(dogadaj, novoStanje);
 
   char log[96];
   snprintf_P(log,
@@ -725,6 +774,22 @@ static void osvjeziDnevniRaspored(const DateTime& sada) {
   raspored.minute[SUNCEVI_DOGADAJ_PODNE] = FIKSNO_PODNE_MINUTA;
   raspored.minute[SUNCEVI_DOGADAJ_VECER] = -1;
 
+  const bool jutroRucno =
+      jeRucnoVrijemeSuncevogDogadajaOmoguceno(SUNCEVI_DOGADAJ_JUTRO);
+  const bool vecerRucno =
+      jeRucnoVrijemeSuncevogDogadajaOmoguceno(SUNCEVI_DOGADAJ_VECER);
+  if (jutroRucno) {
+    raspored.minute[SUNCEVI_DOGADAJ_JUTRO] =
+        normalizirajMinuteUDanu(dohvatiRucnoVrijemeSuncevogDogadajaMin(SUNCEVI_DOGADAJ_JUTRO));
+  }
+  if (vecerRucno) {
+    raspored.minute[SUNCEVI_DOGADAJ_VECER] =
+        normalizirajMinuteUDanu(dohvatiRucnoVrijemeSuncevogDogadajaMin(SUNCEVI_DOGADAJ_VECER));
+  }
+  if (jutroRucno && vecerRucno) {
+    return;
+  }
+
   int izlazMinute = -1;
   int zalazMinute = -1;
   if (!izracunajSunceveMinuteZaDatum(
@@ -736,9 +801,13 @@ static void osvjeziDnevniRaspored(const DateTime& sada) {
     return;
   }
 
-  raspored.minute[SUNCEVI_DOGADAJ_JUTRO] = izracunajJutarnjeVrijemeZvonjenja(izlazMinute);
-  raspored.minute[SUNCEVI_DOGADAJ_VECER] =
-      normalizirajMinuteUDanu(zalazMinute + dohvatiOdgoduSuncevogDogadajaMin(SUNCEVI_DOGADAJ_VECER));
+  if (!jutroRucno) {
+    raspored.minute[SUNCEVI_DOGADAJ_JUTRO] = izracunajJutarnjeVrijemeZvonjenja(izlazMinute);
+  }
+  if (!vecerRucno) {
+    raspored.minute[SUNCEVI_DOGADAJ_VECER] =
+        normalizirajMinuteUDanu(zalazMinute + dohvatiOdgoduSuncevogDogadajaMin(SUNCEVI_DOGADAJ_VECER));
+  }
 }
 
 static void osigurajDnevniRaspored(const DateTime& sada) {

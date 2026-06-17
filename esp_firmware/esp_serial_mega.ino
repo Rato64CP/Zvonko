@@ -427,6 +427,10 @@ bool obradiSuncevePostavkeMegai(char* payload) {
   unsigned int vecerZvono = 0;
   int jutroOdgodaMin = 0;
   int vecerOdgodaMin = 0;
+  bool jutroRucnoVrijeme = false;
+  bool vecerRucnoVrijeme = false;
+  int jutroRucneMinute = 6 * 60;
+  int vecerRucneMinute = 18 * 60;
 
   if (!procitajBoolPolje(payload, "ju=", &jutroOmoguceno) ||
       !procitajUIntPolje(payload, "jb=", &jutroZvono) ||
@@ -439,11 +443,18 @@ bool obradiSuncevePostavkeMegai(char* payload) {
       !procitajBoolPolje(payload, "nr=", &nocnaRasvjeta)) {
     return false;
   }
+  procitajBoolPolje(payload, "jr=", &jutroRucnoVrijeme);
+  procitajIntPolje(payload, "jm=", &jutroRucneMinute);
+  procitajBoolPolje(payload, "vr=", &vecerRucnoVrijeme);
+  procitajIntPolje(payload, "vm=", &vecerRucneMinute);
+
   if (!jeUIntURasponu(jutroZvono, 0U, 2U) ||
       !jeUIntURasponu(podneZvono, 0U, 2U) ||
       !jeUIntURasponu(vecerZvono, 0U, 2U) ||
       !jeIntURasponu(jutroOdgodaMin, -128, 127) ||
-      !jeIntURasponu(vecerOdgodaMin, -128, 127)) {
+      !jeIntURasponu(vecerOdgodaMin, -128, 127) ||
+      !jeIntURasponu(jutroRucneMinute, 0, 1439) ||
+      !jeIntURasponu(vecerRucneMinute, 0, 1439)) {
     return false;
   }
 
@@ -451,11 +462,15 @@ bool obradiSuncevePostavkeMegai(char* payload) {
   megaSuncevePostavke.jutroOmoguceno = jutroOmoguceno;
   megaSuncevePostavke.jutroZvono = static_cast<uint8_t>(jutroZvono);
   megaSuncevePostavke.jutroOdgodaMin = static_cast<int8_t>(jutroOdgodaMin);
+  megaSuncevePostavke.jutroRucnoVrijeme = jutroRucnoVrijeme;
+  megaSuncevePostavke.jutroRucneMinute = static_cast<uint16_t>(jutroRucneMinute);
   megaSuncevePostavke.podneOmoguceno = podneOmoguceno;
   megaSuncevePostavke.podneZvono = static_cast<uint8_t>(podneZvono);
   megaSuncevePostavke.vecerOmoguceno = vecerOmoguceno;
   megaSuncevePostavke.vecerZvono = static_cast<uint8_t>(vecerZvono);
   megaSuncevePostavke.vecerOdgodaMin = static_cast<int8_t>(vecerOdgodaMin);
+  megaSuncevePostavke.vecerRucnoVrijeme = vecerRucnoVrijeme;
+  megaSuncevePostavke.vecerRucneMinute = static_cast<uint16_t>(vecerRucneMinute);
   megaSuncevePostavke.nocnaRasvjeta = nocnaRasvjeta;
   ++megaSuncevePostavke.serijskiBroj;
   return true;

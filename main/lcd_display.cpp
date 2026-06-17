@@ -52,6 +52,11 @@ static bool wifi_ip_prikaz_aktivan = false;
 static unsigned long wifi_ip_prikaz_pocetak_ms = 0;
 static char wifi_ip_poruka[17];
 static const unsigned long WIFI_IP_PRIKAZ_TRAJANJE_MS = 5000UL;
+static bool privremena_poruka_aktivna = false;
+static unsigned long privremena_poruka_pocetak_ms = 0;
+static unsigned long privremena_poruka_trajanje_ms = 0;
+static char privremena_poruka_redak1[17];
+static char privremena_poruka_redak2[17];
 static bool lcd_i2c_greska_aktivna = false;
 static bool lcd_i2c_greska_prijavljena = false;
 static unsigned long lcd_zadnja_i2c_provjera_ms = 0;
@@ -147,6 +152,15 @@ static void resetirajCachePrikazaLCD() {
   last_line1_rtc_tick = 0xFFFFFFFFUL;
   last_line2_refresh = 0;
   last_date_minute = -1;
+}
+
+static void ocistiPrivremenuPoruku() {
+  privremena_poruka_aktivna = false;
+  privremena_poruka_pocetak_ms = 0;
+  privremena_poruka_trajanje_ms = 0;
+  privremena_poruka_redak1[0] = '\0';
+  privremena_poruka_redak2[0] = '\0';
+  resetirajCachePrikazaLCD();
 }
 
 static bool jeWireTimeoutAktivanZaLCD() {
@@ -283,6 +297,23 @@ static void pripremiDrugiRedakZaLCD(const char* tekst) {
 static void upisiDrugiRedakNaLCD(const char* tekst) {
   pripremiDrugiRedakZaLCD(tekst);
   upisiRedakNaLCD(1, line2_buffer, zadnje_ispisani_redak2);
+}
+
+static bool prikaziPrivremenuPorukuAkoJeAktivna() {
+  if (!privremena_poruka_aktivna) {
+    return false;
+  }
+
+  const unsigned long sadaMs = millis();
+  if ((sadaMs - privremena_poruka_pocetak_ms) >= privremena_poruka_trajanje_ms) {
+    ocistiPrivremenuPoruku();
+    return false;
+  }
+
+  upisiRedakNaLCD(0, privremena_poruka_redak1, zadnje_ispisani_redak1);
+  upisiRedakNaLCD(1, privremena_poruka_redak2, zadnje_ispisani_redak2);
+  osvjeziWatchdog();
+  return true;
 }
 
 static void ocistiAktivnostDrugogRetka() {
@@ -899,6 +930,10 @@ void signalizirajFuneral_Mode() {
 void prikaziSat() {
   osvjeziAutomatskoLCDPozadinskoOsvjetljenje();
 
+  if (prikaziPrivremenuPorukuAkoJeAktivna()) {
+    return;
+  }
+
   const unsigned long now_ms = millis();
   const uint32_t rtcTick = dohvatiRtcSekundniBrojac();
   static bool zadnjeStanjeDvotocakaVidljivo = true;
@@ -968,6 +1003,23 @@ void prikaziPoruku(const char* redak1, const char* redak2) {
   if (redak2) {
     upisiDrugiRedakNaLCD(redak2);
   }
+}
+
+void prikaziPrivremenuPoruku(const char* redak1, const char* redak2, unsigned long trajanjeMs) {
+  osvjeziAutomatskoLCDPozadinskoOsvjetljenje();
+
+  if (trajanjeMs == 0) {
+    ocistiPrivremenuPoruku();
+    return;
+  }
+
+  pripremiRedakZaLCD(redak1 != nullptr ? redak1 : "", privremena_poruka_redak1);
+  pripremiRedakZaLCD(redak2 != nullptr ? redak2 : "", privremena_poruka_redak2);
+  privremena_poruka_pocetak_ms = millis();
+  privremena_poruka_trajanje_ms = trajanjeMs;
+  privremena_poruka_aktivna = true;
+  resetirajCachePrikazaLCD();
+  prikaziPrivremenuPorukuAkoJeAktivna();
 }
 
 void prikaziPoruku(const __FlashStringHelper* redak1,

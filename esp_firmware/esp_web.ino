@@ -506,22 +506,30 @@ PostavkeOdgovorMegai posaljiSuncevePostavkeMegai(bool jutroOmoguceno,
                                                  bool vecerOmoguceno,
                                                  unsigned int vecerZvono,
                                                  int vecerOdgodaMin,
+                                                 bool jutroRucnoVrijeme,
+                                                 unsigned int jutroRucneMinute,
+                                                 bool vecerRucnoVrijeme,
+                                                 unsigned int vecerRucneMinute,
                                                  bool nocnaRasvjeta,
                                                  unsigned long timeoutMs) {
   zadnjiOdgovorSustavskihPostavkiMega = POSTAVKE_ODGOVOR_CEKA;
 
-  char naredba[128];
+  char naredba[160];
   snprintf(naredba,
            sizeof(naredba),
-           "SETCFG:SUNCE|ju=%d|jb=%u|jo=%d|pu=%d|pb=%u|vu=%d|vb=%u|vo=%d|nr=%d",
+           "SETCFG:SUNCE|ju=%d|jb=%u|jo=%d|jr=%d|jm=%u|pu=%d|pb=%u|vu=%d|vb=%u|vo=%d|vr=%d|vm=%u|nr=%d",
            jutroOmoguceno ? 1 : 0,
            jutroZvono,
            jutroOdgodaMin,
+           jutroRucnoVrijeme ? 1 : 0,
+           jutroRucneMinute,
            podneOmoguceno ? 1 : 0,
            podneZvono,
            vecerOmoguceno ? 1 : 0,
            vecerZvono,
            vecerOdgodaMin,
+           vecerRucnoVrijeme ? 1 : 0,
+           vecerRucneMinute,
            nocnaRasvjeta ? 1 : 0);
   Serial.println(naredba);
 
@@ -591,19 +599,23 @@ void posaljiJsonBATPostavki(bool prisilno) {
 void posaljiJsonSuncevihPostavki(bool prisilno) {
   osvjeziSuncevePostavkeMegai(prisilno);
 
-  char tijelo[400];
+  char tijelo[520];
   snprintf_P(tijelo,
              sizeof(tijelo),
-             PSTR("{\"known\":%s,\"jutro_enabled\":%s,\"jutro_bell\":%u,\"jutro_offset_minutes\":%d,\"podne_enabled\":%s,\"podne_bell\":%u,\"vecer_enabled\":%s,\"vecer_bell\":%u,\"vecer_offset_minutes\":%d,\"night_light\":%s}"),
+             PSTR("{\"known\":%s,\"jutro_enabled\":%s,\"jutro_bell\":%u,\"jutro_offset_minutes\":%d,\"jutro_manual_time\":%s,\"jutro_manual_minutes\":%u,\"podne_enabled\":%s,\"podne_bell\":%u,\"vecer_enabled\":%s,\"vecer_bell\":%u,\"vecer_offset_minutes\":%d,\"vecer_manual_time\":%s,\"vecer_manual_minutes\":%u,\"night_light\":%s}"),
              megaSuncevePostavke.poznate ? "true" : "false",
              (megaSuncevePostavke.poznate && megaSuncevePostavke.jutroOmoguceno) ? "true" : "false",
              static_cast<unsigned>(megaSuncevePostavke.poznate ? megaSuncevePostavke.jutroZvono : 0U),
              static_cast<int>(megaSuncevePostavke.poznate ? megaSuncevePostavke.jutroOdgodaMin : 0),
+             (megaSuncevePostavke.poznate && megaSuncevePostavke.jutroRucnoVrijeme) ? "true" : "false",
+             static_cast<unsigned>(megaSuncevePostavke.poznate ? megaSuncevePostavke.jutroRucneMinute : 6U * 60U),
              (megaSuncevePostavke.poznate && megaSuncevePostavke.podneOmoguceno) ? "true" : "false",
              static_cast<unsigned>(megaSuncevePostavke.poznate ? megaSuncevePostavke.podneZvono : 0U),
              (megaSuncevePostavke.poznate && megaSuncevePostavke.vecerOmoguceno) ? "true" : "false",
              static_cast<unsigned>(megaSuncevePostavke.poznate ? megaSuncevePostavke.vecerZvono : 0U),
              static_cast<int>(megaSuncevePostavke.poznate ? megaSuncevePostavke.vecerOdgodaMin : 0),
+             (megaSuncevePostavke.poznate && megaSuncevePostavke.vecerRucnoVrijeme) ? "true" : "false",
+             static_cast<unsigned>(megaSuncevePostavke.poznate ? megaSuncevePostavke.vecerRucneMinute : 18U * 60U),
              (megaSuncevePostavke.poznate && megaSuncevePostavke.nocnaRasvjeta) ? "true" : "false");
   webPosluzitelj.send(200, "application/json", tijelo);
 }
@@ -3079,6 +3091,12 @@ void konfigurirajWebPosluzitelj() {
       return;
     }
 
+    osvjeziSuncevePostavkeMegai(true);
+    if (!megaSuncevePostavke.poznate) {
+      webPosluzitelj.send(504, "text/plain", "Mega nije poslala trenutno stanje suncevih postavki.");
+      return;
+    }
+
     const PostavkeOdgovorMegai status = posaljiSuncevePostavkeMegai(
         juArg == "1",
         static_cast<unsigned int>(jb),
@@ -3088,6 +3106,10 @@ void konfigurirajWebPosluzitelj() {
         vuArg == "1",
         static_cast<unsigned int>(vb),
         static_cast<int>(vo),
+        megaSuncevePostavke.poznate && megaSuncevePostavke.jutroRucnoVrijeme,
+        static_cast<unsigned int>(megaSuncevePostavke.poznate ? megaSuncevePostavke.jutroRucneMinute : 6U * 60U),
+        megaSuncevePostavke.poznate && megaSuncevePostavke.vecerRucnoVrijeme,
+        static_cast<unsigned int>(megaSuncevePostavke.poznate ? megaSuncevePostavke.vecerRucneMinute : 18U * 60U),
         nrArg == "1",
         CMD_CEKANJE_NA_MEGU_MS);
 

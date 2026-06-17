@@ -133,18 +133,22 @@ void posaljiBATPostavkeESPu() {
 }
 
 void posaljiSuncevePostavkeESPu() {
-  char linija[128];
+  char linija[160];
   snprintf_P(linija,
              sizeof(linija),
-             PSTR("SET:SUNCE|ju=%d|jb=%u|jo=%d|pu=%d|pb=%u|vu=%d|vb=%u|vo=%d|nr=%d"),
+             PSTR("SET:SUNCE|ju=%d|jb=%u|jo=%d|jr=%d|jm=%d|pu=%d|pb=%u|vu=%d|vb=%u|vo=%d|vr=%d|vm=%d|nr=%d"),
              jeSuncevDogadajOmogucen(SUNCEVI_DOGADAJ_JUTRO) ? 1 : 0,
              static_cast<unsigned>(dohvatiZvonoZaSuncevDogadaj(SUNCEVI_DOGADAJ_JUTRO)),
              dohvatiOdgoduSuncevogDogadajaMin(SUNCEVI_DOGADAJ_JUTRO),
+             jeRucnoVrijemeSuncevogDogadajaOmoguceno(SUNCEVI_DOGADAJ_JUTRO) ? 1 : 0,
+             dohvatiRucnoVrijemeSuncevogDogadajaMin(SUNCEVI_DOGADAJ_JUTRO),
              jeSuncevDogadajOmogucen(SUNCEVI_DOGADAJ_PODNE) ? 1 : 0,
              static_cast<unsigned>(dohvatiZvonoZaSuncevDogadaj(SUNCEVI_DOGADAJ_PODNE)),
              jeSuncevDogadajOmogucen(SUNCEVI_DOGADAJ_VECER) ? 1 : 0,
              static_cast<unsigned>(dohvatiZvonoZaSuncevDogadaj(SUNCEVI_DOGADAJ_VECER)),
              dohvatiOdgoduSuncevogDogadajaMin(SUNCEVI_DOGADAJ_VECER),
+             jeRucnoVrijemeSuncevogDogadajaOmoguceno(SUNCEVI_DOGADAJ_VECER) ? 1 : 0,
+             dohvatiRucnoVrijemeSuncevogDogadajaMin(SUNCEVI_DOGADAJ_VECER),
              jeNocnaRasvjetaOmogucena() ? 1 : 0);
   espSerijskiPort.println(linija);
 }
@@ -303,7 +307,7 @@ bool spremiSustavskePostavkeIzESPa(char* payload) {
   postaviInercijeZvona(static_cast<uint8_t>(inr1), static_cast<uint8_t>(inr2));
   postaviTrajanjeImpulsaCekica(impuls);
 
-  char log[128];
+  char log[160];
   snprintf_P(log,
              sizeof(log),
              PSTR("Mrezni most je spremio sustavske postavke: lcd=%d log=%d ups=%d koc=%d inr1=%u inr2=%u imp=%u"),
@@ -470,7 +474,7 @@ bool spremiBATPostavkeIzESPa(char* payload) {
       static_cast<uint8_t>(modMrtvackog),
       static_cast<uint8_t>(vrstaPokojnickogZvona));
 
-  char log[128];
+  char log[160];
   snprintf_P(log,
              sizeof(log),
              PSTR("Mrezni most je spremio BAT postavke: od=%d do=%d OTK=%u S=%u M=%u POK=%u"),
@@ -498,6 +502,10 @@ bool spremiSuncevePostavkeIzESPa(char* payload) {
   unsigned int vecerZvono = 0;
   int jutroOdgoda = 0;
   int vecerOdgoda = 0;
+  bool jutroRucno = jeRucnoVrijemeSuncevogDogadajaOmoguceno(SUNCEVI_DOGADAJ_JUTRO);
+  bool vecerRucno = jeRucnoVrijemeSuncevogDogadajaOmoguceno(SUNCEVI_DOGADAJ_VECER);
+  int jutroRucneMinute = dohvatiRucnoVrijemeSuncevogDogadajaMin(SUNCEVI_DOGADAJ_JUTRO);
+  int vecerRucneMinute = dohvatiRucnoVrijemeSuncevogDogadajaMin(SUNCEVI_DOGADAJ_VECER);
   bool jutroOmogucenoPoznato = false;
   bool podneOmogucenoPoznato = false;
   bool vecerOmogucenoPoznato = false;
@@ -534,6 +542,10 @@ bool spremiSuncevePostavkeIzESPa(char* payload) {
     } else if (strcmp(kljuc, "jo") == 0) {
       if (!parsirajIntPoljeSustava(vrijednost, jutroOdgoda)) return false;
       jutroOdgodaPoznata = true;
+    } else if (strcmp(kljuc, "jr") == 0) {
+      if (!parsirajBoolZastavicuSustava(vrijednost, jutroRucno)) return false;
+    } else if (strcmp(kljuc, "jm") == 0) {
+      if (!parsirajIntPoljeSustava(vrijednost, jutroRucneMinute)) return false;
     } else if (strcmp(kljuc, "pu") == 0) {
       if (!parsirajBoolZastavicuSustava(vrijednost, podneOmoguceno)) return false;
       podneOmogucenoPoznato = true;
@@ -549,6 +561,10 @@ bool spremiSuncevePostavkeIzESPa(char* payload) {
     } else if (strcmp(kljuc, "vo") == 0) {
       if (!parsirajIntPoljeSustava(vrijednost, vecerOdgoda)) return false;
       vecerOdgodaPoznata = true;
+    } else if (strcmp(kljuc, "vr") == 0) {
+      if (!parsirajBoolZastavicuSustava(vrijednost, vecerRucno)) return false;
+    } else if (strcmp(kljuc, "vm") == 0) {
+      if (!parsirajIntPoljeSustava(vrijednost, vecerRucneMinute)) return false;
     } else if (strcmp(kljuc, "nr") == 0) {
       if (!parsirajBoolZastavicuSustava(vrijednost, nocnaRasvjeta)) return false;
       nocnaRasvjetaPoznata = true;
@@ -565,7 +581,9 @@ bool spremiSuncevePostavkeIzESPa(char* payload) {
   }
   if (!jeUIntURasponu(jutroZvono, 0U, 2U) ||
       !jeUIntURasponu(podneZvono, 0U, 2U) ||
-      !jeUIntURasponu(vecerZvono, 0U, 2U)) {
+      !jeUIntURasponu(vecerZvono, 0U, 2U) ||
+      jutroRucneMinute < 0 || jutroRucneMinute >= 1440 ||
+      vecerRucneMinute < 0 || vecerRucneMinute >= 1440) {
     return false;
   }
 
@@ -573,7 +591,9 @@ bool spremiSuncevePostavkeIzESPa(char* payload) {
       SUNCEVI_DOGADAJ_JUTRO,
       jutroOmoguceno,
       static_cast<uint8_t>(jutroZvono),
-      jutroOdgoda);
+      jutroOdgoda,
+      jutroRucno,
+      jutroRucneMinute);
   postaviSuncevDogadaj(
       SUNCEVI_DOGADAJ_PODNE,
       podneOmoguceno,
@@ -583,21 +603,29 @@ bool spremiSuncevePostavkeIzESPa(char* payload) {
       SUNCEVI_DOGADAJ_VECER,
       vecerOmoguceno,
       static_cast<uint8_t>(vecerZvono),
-      vecerOdgoda);
+      vecerOdgoda,
+      vecerRucno,
+      vecerRucneMinute);
   postaviNocnuRasvjetuOmoguceno(nocnaRasvjeta);
 
-  char log[128];
+  char log[160];
   snprintf_P(log,
              sizeof(log),
-             PSTR("Mrezni most je spremio sunceve postavke: J=%d/%u/%d P=%d/%u V=%d/%u/%d NR=%d"),
+             PSTR("Mrezni most je spremio sunceve postavke: J=%d/%u/%d R%d %02d:%02d P=%d/%u V=%d/%u/%d R%d %02d:%02d NR=%d"),
              jutroOmoguceno ? 1 : 0,
              jutroZvono,
              jutroOdgoda,
+             jutroRucno ? 1 : 0,
+             jutroRucneMinute / 60,
+             jutroRucneMinute % 60,
              podneOmoguceno ? 1 : 0,
              podneZvono,
              vecerOmoguceno ? 1 : 0,
              vecerZvono,
              vecerOdgoda,
+             vecerRucno ? 1 : 0,
+             vecerRucneMinute / 60,
+             vecerRucneMinute % 60,
              nocnaRasvjeta ? 1 : 0);
   posaljiPCLog(log);
   return true;

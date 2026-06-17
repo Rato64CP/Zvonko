@@ -152,11 +152,15 @@ struct MegaSuncevePostavke {
   bool jutroOmoguceno;
   uint8_t jutroZvono;
   int8_t jutroOdgodaMin;
+  bool jutroRucnoVrijeme;
+  uint16_t jutroRucneMinute;
   bool podneOmoguceno;
   uint8_t podneZvono;
   bool vecerOmoguceno;
   uint8_t vecerZvono;
   int8_t vecerOdgodaMin;
+  bool vecerRucnoVrijeme;
+  uint16_t vecerRucneMinute;
   bool nocnaRasvjeta;
   unsigned long serijskiBroj;
 };
@@ -278,10 +282,14 @@ MegaSuncevePostavke megaSuncevePostavke = {
   0U,
   0,
   false,
+  6 * 60,
+  false,
   0U,
   false,
   0U,
   0,
+  false,
+  18 * 60,
   false,
   0UL
 };
@@ -386,6 +394,10 @@ PostavkeOdgovorMegai posaljiSuncevePostavkeMegai(bool jutroOmoguceno,
                                                  bool vecerOmoguceno,
                                                  unsigned int vecerZvono,
                                                  int vecerOdgodaMin,
+                                                 bool jutroRucnoVrijeme,
+                                                 unsigned int jutroRucneMinute,
+                                                 bool vecerRucnoVrijeme,
+                                                 unsigned int vecerRucneMinute,
                                                  bool nocnaRasvjeta,
                                                  unsigned long timeoutMs);
 PostavkeOdgovorMegai posaljiMisePostavkeMegai(bool dnevnaOmogucena,

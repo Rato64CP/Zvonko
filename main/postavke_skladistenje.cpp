@@ -6,6 +6,56 @@
 
 #include "i2c_eeprom.h"
 
+namespace {
+
+struct SunceviDogadajiSpremnikV5 {
+  uint16_t potpis;
+  uint8_t verzija;
+  uint8_t maskaDogadaja;
+  uint8_t nocnaRasvjetaOmogucena;
+  uint8_t zvona[3];
+  int16_t odgodeMin[3];
+  uint16_t checksum;
+};
+
+uint16_t izracunajChecksumSuncevihDogadajaV5(const SunceviDogadajiSpremnikV5& ulaz) {
+  SunceviDogadajiSpremnikV5 kopija = ulaz;
+  kopija.checksum = 0;
+
+  const uint8_t* podaci = reinterpret_cast<const uint8_t*>(&kopija);
+  uint16_t suma = 0;
+  for (size_t i = 0; i < sizeof(kopija); ++i) {
+    suma = static_cast<uint16_t>((suma << 1) | (suma >> 15));
+    suma = static_cast<uint16_t>(suma + podaci[i] + 0x27);
+  }
+  return suma;
+}
+
+bool jeValjanEEPROMZapisSuncevihDogadajaV5(const SunceviDogadajiSpremnikV5& spremnik) {
+  return spremnik.potpis == EepromLayout::SUNCEVI_DOGADAJI_POTPIS &&
+         spremnik.verzija == 5 &&
+         spremnik.checksum == izracunajChecksumSuncevihDogadajaV5(spremnik);
+}
+
+void migrirajSunceveDogadajeV5(const SunceviDogadajiSpremnikV5& izvor,
+                               EepromLayout::SunceviDogadajiSpremnik& cilj) {
+  memset(&cilj, 0, sizeof(cilj));
+  cilj.potpis = izvor.potpis;
+  cilj.verzija = izvor.verzija;
+  cilj.maskaDogadaja = izvor.maskaDogadaja;
+  cilj.nocnaRasvjetaOmogucena = izvor.nocnaRasvjetaOmogucena;
+  memcpy(cilj.zvona, izvor.zvona, sizeof(cilj.zvona));
+  memcpy(cilj.odgodeMin, izvor.odgodeMin, sizeof(cilj.odgodeMin));
+  cilj.rucnaVremenaMaska = 0;
+  cilj.reserved = 0;
+  cilj.rucneMinute[0] = 6 * 60;
+  cilj.rucneMinute[1] = 12 * 60;
+  cilj.rucneMinute[2] = 18 * 60;
+  cilj.checksum = 0;
+}
+
+}  // namespace
+
 uint16_t izracunajChecksumPostavki(const EepromLayout::PostavkeSpremnik& ulaz) {
   EepromLayout::PostavkeSpremnik kopija = ulaz;
   kopija.checksum = 0;
@@ -103,11 +153,22 @@ bool ucitajSunceveDogadajeSkeniranjem(EepromLayout::SunceviDogadajiSpremnik& spr
   if (!VanjskiEEPROM::procitaj(EepromLayout::BAZA_SUNCEVI_DOGADAJI, &kandidat, sizeof(kandidat))) {
     return false;
   }
-  if (!jeValjanEEPROMZapisSuncevihDogadaja(kandidat)) {
+  if (jeValjanEEPROMZapisSuncevihDogadaja(kandidat)) {
+    spremnik = kandidat;
+    return true;
+  }
+
+  SunceviDogadajiSpremnikV5 stariKandidat{};
+  if (!VanjskiEEPROM::procitaj(EepromLayout::BAZA_SUNCEVI_DOGADAJI,
+                               &stariKandidat,
+                               sizeof(stariKandidat))) {
+    return false;
+  }
+  if (!jeValjanEEPROMZapisSuncevihDogadajaV5(stariKandidat)) {
     return false;
   }
 
-  spremnik = kandidat;
+  migrirajSunceveDogadajeV5(stariKandidat, spremnik);
   return true;
 }
 

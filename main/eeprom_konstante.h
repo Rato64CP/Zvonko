@@ -214,16 +214,23 @@ struct SunceviDogadajiSpremnik {
   uint8_t nocnaRasvjetaOmogucena;
   uint8_t zvona[3];
   int16_t odgodeMin[3];
+  uint8_t rucnaVremenaMaska;
+  uint8_t reserved;
+  uint16_t rucneMinute[3];
   uint16_t checksum;
 };
 
 constexpr uint16_t SUNCEVI_DOGADAJI_POTPIS = 0x5344;
-constexpr uint8_t SUNCEVI_DOGADAJI_VERZIJA = 5;
+constexpr uint8_t SUNCEVI_DOGADAJI_VERZIJA = 6;
 
 constexpr int BAZA_SUNCEVI_DOGADAJI =
   BAZA_EEPROM_DIJAGNOSTIKA + VELICINA_EEPROM_DIJAGNOSTIKA;
-constexpr int SLOTOVI_SUNCEVI_DOGADAJI = 6;
+// Verzija 6 ima veci zapis zbog rucnih vremena Zdravomarije. Broj slotova je
+// smanjen tako da cijeli segment ostane 96 B i ne pomakne blokove Blagdani/Mise.
+constexpr int SLOTOVI_SUNCEVI_DOGADAJI = 4;
 constexpr int SLOT_SIZE_SUNCEVI_DOGADAJI = sizeof(SunceviDogadajiSpremnik);
+static_assert(SLOT_SIZE_SUNCEVI_DOGADAJI == 24,
+              "Suncevi dogadaji moraju ostati 24 B da segment ostane 96 B");
 
 // ==================== BLAGDANI I SVETE MISE ====================
 // Zaseban blok za web-postavke blagdana toranjskog sata.

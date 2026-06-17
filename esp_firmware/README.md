@@ -66,6 +66,7 @@ Ova podmapa sadrzi firmware za vanjski `ESP32` modul koji radi kao mrezni sloj t
 - `BAT` ukljucuje sate `od/do`, modove `OTK`, `S`, `M` i vrstu pokojnickog zvona `POK`
 - `BAT od/do` na webu znaci raspon u kojem je redovno otkucavanje dopusteno; izvan tog raspona `Mega` blokira samo otkucavanje kroz `main/postavke.cpp` i `main/otkucavanje.cpp`
 - `Sunce` ukljucuje `Jutro`, `Podne`, `Vecer`, odabir zvona, jutarnje/vecernje odgode i `Nocnu rasvjetu`
+- rucni nacin jutarnje/vecernje Zdravomarije uredjuje se na lokalnom LCD izborniku `Mege`; ESP protokol ga prenosi i cuva da ga web spremanje ne pregazi
 - `Blagdani` ukljucuju dnevnu i nedjeljnu misu te unaprijed zadanu listu `15` nepomicnih i `7` pomicnih blagdana; za svaki blagdan uredjuje se samo ukljucenje i vrijeme mise `HH:MM`
 - dnevna misa pokrece samo `MUSKO` zvono `30 min` prije upisanog vremena mise `HH:MM`, uz radno trajanje zvonjenja iz `main/postavke.cpp`
 - nedjeljna i blagdanska misa pokrecu nedjeljno zvonjenje oba zvona `2 h` i `1 h` prije upisanog vremena mise `HH:MM`, bez dodatnog `slavljenja`
@@ -112,6 +113,7 @@ Ova podmapa sadrzi firmware za vanjski `ESP32` modul koji radi kao mrezni sloj t
 - `STATUS:` vraca objedinjeni status koji dashboard koristi za boju tipki
 - `SET:SUSTAV|...`, `SET:STAPICI|...`, `SET:BAT|...`, `SET:SUNCE|...`, `SET:MISE|...`, `SET:BLAGDANI_NEP|...` i `SET:BLAGDANI_POM|...` vracaju trenutno stanje pojedinih skupina
 - `SETCFG:SUSTAV|...`, `SETCFG:STAPICI|...`, `SETCFG:BAT|...`, `SETCFG:SUNCE|...`, `SETCFG:MISE|...`, `SETCFG:BLAGDANI_NEP|...` i `SETCFG:BLAGDANI_POM|...` salju novi puni paket odgovarajuce skupine prema `Megi`
+- `SET:SUNCE` i `SETCFG:SUNCE` koriste `jr/jm` za jutarnji rucni nacin/minute i `vr/vm` za vecernji rucni nacin/minute
 - `ACK:*`, `ERR:*` i `NTPLOG:*` linije sluze za potvrde i dijagnostiku mreznog mosta
 
 ## ⏱️ UDP NTP tok

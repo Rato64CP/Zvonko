@@ -85,6 +85,11 @@
   - svaki pritisak prebaci stanje odgovarajuceg suncevog dogadaja
   - pripadna LED lampica stalno svijetli dok je dogadaj omogucen
   - lampica treperi dok to zvonjenje upravo traje
+  - pri promjeni stanja LCD prikazuje potvrdu `5 s`: za ukljucenje naziv termina i `HH:MM`, a za iskljucenje `ZDRAVOMARIJA OFF` ili `PODNE OFF`
+- vrijeme Zdravomarije u `JUTRO` i `VECER` uredjuje se u lokalnom izborniku `Sunce`
+  - nacin `AUTO` koristi suncev izracun iz `main/sunceva_automatika.cpp` i postojece odgode
+  - nacin `RUC` koristi korisnikov upis `HH:MM` i tada se za taj termin ne koristi suncev izracun
+  - tipke i LED lampice `JUTRO`, `PODNE` i `VECER` i dalje samo pale/gase odgovarajuci termin
 - kroz `/settings` i `/blagdani` `ESP32` sada moze sigurno uredjivati `Sustav`, `Stapice`, `BAT`, `Sunce`, redovite mise i unaprijed zadane blagdanske mise, bez diranja vremena, datuma, kazaljki i okretne ploce
 - dnevna misa pokrece samo `MUSKO` zvono `30 min` prije upisanog vremena mise `HH:MM`
 - nedjeljna i blagdanska misa pokrecu nedjeljno zvonjenje oba zvona `2 h` i `1 h` prije upisanog vremena mise `HH:MM`, bez dodatnog `slavljenja`
@@ -182,6 +187,8 @@
 
 ## 📚 Dodatni README
 
+- [Korisnicke upute za ormaric i Megu](docs/korisnicke_upute_ormaric_mega.md)
+- [Korisnicke upute za web sucelje ESP-a](docs/korisnicke_upute_web_esp.md)
 - [README za Mega firmware](main/README.md)
 - [README za ESP firmware](esp_firmware/README.md)
 - [Popis ESP web API ruta toranjskog sata](docs/esp_web_api_toranjskog_sata.md)

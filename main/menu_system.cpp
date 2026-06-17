@@ -312,10 +312,12 @@ static const int BROJ_DOPUSTENIH_SUNCEVIH_ODGODA =
 static const uint8_t SUNCE_STRANICA_NOCNA_RASVJETA = SUNCEVI_DOGADAJ_BROJ;
 static const uint8_t BROJ_STRANICA_SUNCA = SUNCEVI_DOGADAJ_BROJ + 1;
 static uint8_t sunceDogadajUredjivanje = 0;
-static uint8_t faza_postavki_sunca = 0; // 0 = aktivno, 1 = zvono, 2 = odgoda
+static uint8_t faza_postavki_sunca = 0; // 0 = aktivno, 1 = zvono, 2 = AUTO/RUC, 3/4 = odgoda ili HH/MM
 static bool sunceOmogucenoUredjivanje[SUNCEVI_DOGADAJ_BROJ] = {false, false, false};
 static uint8_t sunceZvonoUredjivanje[SUNCEVI_DOGADAJ_BROJ] = {1, 1, 1};
 static int sunceOdgodaUredjivanje[SUNCEVI_DOGADAJ_BROJ] = {0, 0, 0};
+static bool sunceRucnoVrijemeUredjivanje[SUNCEVI_DOGADAJ_BROJ] = {false, false, false};
+static int sunceRucneMinuteUredjivanje[SUNCEVI_DOGADAJ_BROJ] = {6 * 60, 12 * 60, 18 * 60};
 static bool nocnaRasvjetaUredjivanje = false;
 
 // ==================== BLAGDANI ====================
@@ -498,9 +500,13 @@ static void ucitajSunceveDogadajeZaUredjivanje() {
     sunceOmogucenoUredjivanje[i] = jeSuncevDogadajOmogucen(i);
     sunceZvonoUredjivanje[i] = dohvatiZvonoZaSuncevDogadaj(i);
     sunceOdgodaUredjivanje[i] = dohvatiOdgoduSuncevogDogadajaMin(i);
+    sunceRucnoVrijemeUredjivanje[i] = jeRucnoVrijemeSuncevogDogadajaOmoguceno(i);
+    sunceRucneMinuteUredjivanje[i] = dohvatiRucnoVrijemeSuncevogDogadajaMin(i);
   }
   nocnaRasvjetaUredjivanje = jeNocnaRasvjetaOmogucena();
   sunceOdgodaUredjivanje[SUNCEVI_DOGADAJ_PODNE] = 0;
+  sunceRucnoVrijemeUredjivanje[SUNCEVI_DOGADAJ_PODNE] = false;
+  sunceRucneMinuteUredjivanje[SUNCEVI_DOGADAJ_PODNE] = 12 * 60;
   sunceDogadajUredjivanje = SUNCEVI_DOGADAJ_JUTRO;
   faza_postavki_sunca = 0;
 }
@@ -543,18 +549,22 @@ static uint8_t pomakniSatSviSvetiZavrsetak(uint8_t trenutniSat, int smjer) {
   return static_cast<uint8_t>(noviSat);
 }
 
-static void dohvatiNazivSuncevogDogadaja(uint8_t dogadaj, char* odrediste, size_t velicina) {
-  if (dogadaj == SUNCEVI_DOGADAJ_JUTRO) {
-    snprintf_P(odrediste, velicina, PSTR("JUTRO"));
-  } else if (dogadaj == SUNCEVI_DOGADAJ_PODNE) {
-    snprintf_P(odrediste, velicina, PSTR("PODNE"));
-  } else {
-    snprintf_P(odrediste, velicina, PSTR("VECER"));
-  }
-}
-
 static bool jeStranicaNocneRasvjeteUSuncu() {
   return sunceDogadajUredjivanje == SUNCE_STRANICA_NOCNA_RASVJETA;
+}
+
+static bool podrzavaRucnoVrijemeSuncaUMeniju(uint8_t dogadaj) {
+  return dogadaj == SUNCEVI_DOGADAJ_JUTRO || dogadaj == SUNCEVI_DOGADAJ_VECER;
+}
+
+static int normalizirajMinuteSuncaUMeniju(int minute) {
+  while (minute < 0) {
+    minute += 1440;
+  }
+  while (minute >= 1440) {
+    minute -= 1440;
+  }
+  return minute;
 }
 
 static uint8_t dohvatiMaksFazuSuncaZaAktivnuStranicu() {
@@ -562,7 +572,12 @@ static uint8_t dohvatiMaksFazuSuncaZaAktivnuStranicu() {
     return 0;
   }
 
-  return (sunceDogadajUredjivanje == SUNCEVI_DOGADAJ_PODNE) ? 1 : 2;
+  const uint8_t dogadaj =
+      static_cast<uint8_t>(constrain(sunceDogadajUredjivanje, 0, SUNCEVI_DOGADAJ_BROJ - 1));
+  if (dogadaj == SUNCEVI_DOGADAJ_PODNE) {
+    return 1;
+  }
+  return sunceRucnoVrijemeUredjivanje[dogadaj] ? 4 : 3;
 }
 
 static void pomakniStranicuSunca(int smjer) {
@@ -576,6 +591,11 @@ static void pomakniStranicuSunca(int smjer) {
   sunceDogadajUredjivanje = static_cast<uint8_t>(novaStranica);
   if (jeStranicaNocneRasvjeteUSuncu()) {
     faza_postavki_sunca = 0;
+  } else {
+    const uint8_t maksFaza = dohvatiMaksFazuSuncaZaAktivnuStranicu();
+    if (faza_postavki_sunca > maksFaza) {
+      faza_postavki_sunca = maksFaza;
+    }
   }
 }
 
@@ -598,6 +618,32 @@ static int prilagodiSuncevuOdgoduZaKorak(int trenutnaOdgoda, int smjer) {
   }
 
   return DOPUSTENE_SUNCEVE_ODGODE[indeks];
+}
+
+static void pomakniRucniSatSunca(uint8_t dogadaj, int smjer) {
+  int minute = normalizirajMinuteSuncaUMeniju(sunceRucneMinuteUredjivanje[dogadaj]);
+  int sat = minute / 60;
+  const int minuta = minute % 60;
+  sat += smjer;
+  if (sat < 0) {
+    sat = 23;
+  } else if (sat > 23) {
+    sat = 0;
+  }
+  sunceRucneMinuteUredjivanje[dogadaj] = sat * 60 + minuta;
+}
+
+static void pomakniRucnuMinutuSunca(uint8_t dogadaj, int smjer) {
+  const int minute = normalizirajMinuteSuncaUMeniju(sunceRucneMinuteUredjivanje[dogadaj]);
+  const int sat = minute / 60;
+  int minuta = minute % 60;
+  minuta += smjer;
+  if (minuta < 0) {
+    minuta = 59;
+  } else if (minuta > 59) {
+    minuta = 0;
+  }
+  sunceRucneMinuteUredjivanje[dogadaj] = sat * 60 + minuta;
 }
 
 static void potvrdiSpremanjeTihihSati() {
@@ -628,7 +674,9 @@ static void potvrdiSpremanjeSuncevihDogadaja() {
     postaviSuncevDogadaj(i,
                          sunceOmogucenoUredjivanje[i],
                          sunceZvonoUredjivanje[i],
-                         sunceOdgodaUredjivanje[i]);
+                         sunceOdgodaUredjivanje[i],
+                         sunceRucnoVrijemeUredjivanje[i],
+                         sunceRucneMinuteUredjivanje[i]);
   }
   postaviNocnuRasvjetuOmoguceno(nocnaRasvjetaUredjivanje);
   sunceDogadajUredjivanje = SUNCEVI_DOGADAJ_JUTRO;
@@ -912,11 +960,13 @@ static void prikaziSunceveDogadaje() {
 
   const uint8_t dogadaj =
       static_cast<uint8_t>(constrain(sunceDogadajUredjivanje, 0, SUNCEVI_DOGADAJ_BROJ - 1));
-  char naziv[7];
-  dohvatiNazivSuncevogDogadaja(dogadaj, naziv, sizeof(naziv));
-
   int minuteDogadaja = 0;
-  if (dohvatiDanasnjeVrijemeSuncevogDogadajaMin(dogadaj, minuteDogadaja)) {
+  const bool imaVrijemeZaPrikaz =
+      (podrzavaRucnoVrijemeSuncaUMeniju(dogadaj) &&
+       sunceRucnoVrijemeUredjivanje[dogadaj])
+          ? (minuteDogadaja = normalizirajMinuteSuncaUMeniju(sunceRucneMinuteUredjivanje[dogadaj]), true)
+          : dohvatiDanasnjeVrijemeSuncevogDogadajaMin(dogadaj, minuteDogadaja);
+  if (imaVrijemeZaPrikaz) {
     const int sat = minuteDogadaja / 60;
     const int minuta = minuteDogadaja % 60;
     snprintf_P(redak1, sizeof(redak1), PSTR("Danas %02d:%02d LR"), sat, minuta);
@@ -924,18 +974,31 @@ static void prikaziSunceveDogadaje() {
       FlashTekst::kopirajLiteral(redak1, sizeof(redak1), PSTR("Danas --:-- LR"));
   }
 
+  const char oznakaDogadaja =
+      (dogadaj == SUNCEVI_DOGADAJ_JUTRO) ? 'J' :
+      ((dogadaj == SUNCEVI_DOGADAJ_PODNE) ? 'P' : 'V');
   if (dogadaj == SUNCEVI_DOGADAJ_PODNE) {
     snprintf_P(redak2,
                sizeof(redak2),
-               PSTR("%s %u Z%u FIK"),
-               naziv,
+               PSTR("%c %u Z%u FIKSNO"),
+               oznakaDogadaja,
                sunceOmogucenoUredjivanje[dogadaj] ? 1U : 0U,
                static_cast<unsigned>(sunceZvonoUredjivanje[dogadaj]));
+  } else if (sunceRucnoVrijemeUredjivanje[dogadaj]) {
+    const int rucneMinute = normalizirajMinuteSuncaUMeniju(sunceRucneMinuteUredjivanje[dogadaj]);
+    snprintf_P(redak2,
+               sizeof(redak2),
+               PSTR("%c %u Z%u R %02d:%02d"),
+               oznakaDogadaja,
+               sunceOmogucenoUredjivanje[dogadaj] ? 1U : 0U,
+               static_cast<unsigned>(sunceZvonoUredjivanje[dogadaj]),
+               rucneMinute / 60,
+               rucneMinute % 60);
   } else {
     snprintf_P(redak2,
                sizeof(redak2),
-               PSTR("%s %u Z%u %+03d"),
-               naziv,
+               PSTR("%c %u Z%u A%+03d"),
+               oznakaDogadaja,
                sunceOmogucenoUredjivanje[dogadaj] ? 1U : 0U,
                static_cast<unsigned>(sunceZvonoUredjivanje[dogadaj]),
                sunceOdgodaUredjivanje[dogadaj]);
@@ -946,13 +1009,19 @@ static void prikaziSunceveDogadaje() {
   lcd.blink();
   switch (faza_postavki_sunca) {
     case 0:
-      lcd.setCursor(6, 1);
+      lcd.setCursor(2, 1);
       break;
     case 1:
-      lcd.setCursor(9, 1);
+      lcd.setCursor(5, 1);
+      break;
+    case 2:
+      lcd.setCursor(7, 1);
+      break;
+    case 3:
+      lcd.setCursor(sunceRucnoVrijemeUredjivanje[dogadaj] ? 9 : 8, 1);
       break;
     default:
-      lcd.setCursor(11, 1);
+      lcd.setCursor(12, 1);
       break;
   }
 }
@@ -1512,7 +1581,13 @@ static void obradiKlucSunce(KeyEvent event) {
       } else if (faza_postavki_sunca == 1) {
         sunceZvonoUredjivanje[dogadaj] =
             (sunceZvonoUredjivanje[dogadaj] >= 2) ? 1 : (sunceZvonoUredjivanje[dogadaj] + 1);
-      } else {
+      } else if (faza_postavki_sunca == 2 && podrzavaRucnoVrijemeSuncaUMeniju(dogadaj)) {
+        sunceRucnoVrijemeUredjivanje[dogadaj] = !sunceRucnoVrijemeUredjivanje[dogadaj];
+      } else if (faza_postavki_sunca == 3 && sunceRucnoVrijemeUredjivanje[dogadaj]) {
+        pomakniRucniSatSunca(dogadaj, 1);
+      } else if (faza_postavki_sunca == 4 && sunceRucnoVrijemeUredjivanje[dogadaj]) {
+        pomakniRucnuMinutuSunca(dogadaj, 1);
+      } else if (faza_postavki_sunca == 3) {
         sunceOdgodaUredjivanje[dogadaj] =
             prilagodiSuncevuOdgoduZaKorak(sunceOdgodaUredjivanje[dogadaj], 1);
       }
@@ -1525,7 +1600,13 @@ static void obradiKlucSunce(KeyEvent event) {
       } else if (faza_postavki_sunca == 1) {
         sunceZvonoUredjivanje[dogadaj] =
             (sunceZvonoUredjivanje[dogadaj] <= 1) ? 2 : (sunceZvonoUredjivanje[dogadaj] - 1);
-      } else {
+      } else if (faza_postavki_sunca == 2 && podrzavaRucnoVrijemeSuncaUMeniju(dogadaj)) {
+        sunceRucnoVrijemeUredjivanje[dogadaj] = !sunceRucnoVrijemeUredjivanje[dogadaj];
+      } else if (faza_postavki_sunca == 3 && sunceRucnoVrijemeUredjivanje[dogadaj]) {
+        pomakniRucniSatSunca(dogadaj, -1);
+      } else if (faza_postavki_sunca == 4 && sunceRucnoVrijemeUredjivanje[dogadaj]) {
+        pomakniRucnuMinutuSunca(dogadaj, -1);
+      } else if (faza_postavki_sunca == 3) {
         sunceOdgodaUredjivanje[dogadaj] =
             prilagodiSuncevuOdgoduZaKorak(sunceOdgodaUredjivanje[dogadaj], -1);
       }
@@ -1778,7 +1859,15 @@ bool jePonavljanjeTipkeZaMeniDozvoljeno(KeyEvent event) {
       return true;
 
     case MENU_STATE_SUNCE_SETTINGS:
-      return !jeStranicaNocneRasvjeteUSuncu() && faza_postavki_sunca == 2;
+      if (jeStranicaNocneRasvjeteUSuncu()) {
+        return false;
+      }
+      if (sunceDogadajUredjivanje == SUNCEVI_DOGADAJ_PODNE) {
+        return false;
+      }
+      return sunceRucnoVrijemeUredjivanje[sunceDogadajUredjivanje]
+                 ? (faza_postavki_sunca >= 3)
+                 : (faza_postavki_sunca == 3);
 
     case MENU_STATE_HOLIDAY_SETTINGS:
       return stranica_postavki_blagdana == 1 && faza_postavki_blagdana >= 1;

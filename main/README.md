@@ -97,6 +97,7 @@ Ova podmapa sadrzi glavni firmware projekta `ZVONKO v. 1.0` za `Arduino Mega 256
 
 ## 💾 EEPROM i recovery
 
+- `SET:SUNCE` i `SETCFG:SUNCE` nose i polja `jr/jm` te `vr/vm` za rucni nacin i minute u danu jutarnje/vecernje Zdravomarije
 - vanjska `24C32 EEPROM` ili `FM24W256 FRAM` memorija cuva postavke i kriticno radno stanje
 - iako je fizicki kapacitet veci, toranjski sat zadrzava postojeci kompatibilni raspored unutar prvih `4096 B`
 - `UnifiedMotionState` koristi `48` rotirajucih slotova za kazaljke i okretnu plocu
@@ -137,6 +138,11 @@ Ova podmapa sadrzi glavni firmware projekta `ZVONKO v. 1.0` za `Arduino Mega 256
 - lokalni ulazi `SUNCE JUTRO`, `SUNCE PODNE` i `SUNCE VECER` rade kao trenutne servisne tipke
   - svaki pritisak prebaci stanje odgovarajuceg suncevog dogadaja
   - pripadna LED lampica stalno svijetli dok je funkcija ukljucena, a treperi dok to zvonjenje traje
+  - LCD nakon pritiska `5 s` prikazuje naziv termina i `HH:MM` za ukljucenje, odnosno `ZDRAVOMARIJA OFF` ili `PODNE OFF` za iskljucenje
+- lokalni izbornik `Sunce` za Zdravomariju razlikuje izvor vremena
+  - `JUTRO` i `VECER` mogu raditi u nacinu `AUTO`, gdje `main/sunceva_automatika.cpp` racuna izlazak/zalazak sunca i koristi spremljenu odgodu
+  - `JUTRO` i `VECER` mogu raditi u nacinu `RUC`, gdje korisnik upisuje vlastito vrijeme `HH:MM`
+  - `PODNE` ostaje fiksni podnevni termin, a tipke i LED lampice ne mijenjaju izvor vremena nego samo ON/OFF stanje termina
 - uredivanje polozaja okretne ploce u izborniku ide samo po valjanim koracima od `15 min`
 - glavni LCD u `UPS modu` prikazuje `NEMA STRUJE!`, a ponedjeljak skracuje u `PON.` radi urednog prikaza datuma
 - prvi red LCD-a koristi polja `11-13` za `NTP`, `MAN`, `ERR` ili `---`, dok polja `15-16` prikazuju temperaturu `DS3231` modula

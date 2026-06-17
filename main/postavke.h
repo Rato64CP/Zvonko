@@ -116,6 +116,8 @@ bool jeNTPOmogucen();
 bool jeSuncevDogadajOmogucen(uint8_t dogadaj);
 uint8_t dohvatiZvonoZaSuncevDogadaj(uint8_t dogadaj);
 int dohvatiOdgoduSuncevogDogadajaMin(uint8_t dogadaj);
+bool jeRucnoVrijemeSuncevogDogadajaOmoguceno(uint8_t dogadaj);
+int dohvatiRucnoVrijemeSuncevogDogadajaMin(uint8_t dogadaj);
 bool jeNocnaRasvjetaOmogucena();
 bool jeBlagdanskoSlavljenjeOmoguceno(uint8_t dogadaj);
 bool jeBlagdanskoRazdobljeOmoguceno(uint8_t razdoblje);
@@ -134,6 +136,12 @@ void postaviLCDPozadinskoOsvjetljenje(bool ukljuceno);
 void postaviPCLogiranjeOmoguceno(bool omoguceno);
 void postaviObrnutuLogikuIzlaznihReleja(bool omoguceno);
 void postaviSuncevDogadaj(uint8_t dogadaj, bool omogucen, uint8_t zvono, int odgodaMin);
+void postaviSuncevDogadaj(uint8_t dogadaj,
+                          bool omogucen,
+                          uint8_t zvono,
+                          int odgodaMin,
+                          bool rucnoVrijemeOmoguceno,
+                          int rucnoVrijemeMin);
 void postaviNocnuRasvjetuOmoguceno(bool omoguceno);
 void postaviBlagdanskePostavke(uint8_t slavljenjeMaska, uint8_t razdobljaMaska);
 void postaviSviSvetiPostavke(bool omoguceno, uint8_t pocetakSat, uint8_t zavrsetakSat);

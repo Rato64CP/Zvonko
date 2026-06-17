@@ -33,6 +33,8 @@ constexpr int16_t DOPUSTENE_SUNCEVE_ODGODE_MIN[] = {-30, -20, -10, 0, 10, 20, 30
 constexpr size_t BROJ_DOPUSTENIH_SUNCEVIH_ODGODA =
     sizeof(DOPUSTENE_SUNCEVE_ODGODE_MIN) / sizeof(DOPUSTENE_SUNCEVE_ODGODE_MIN[0]);
 constexpr uint8_t MASKA_SUNCEVIH_DOGADAJA = 0x07;
+constexpr uint8_t MASKA_RUCNIH_SUNCEVIH_VREMENA =
+    (1U << SUNCEVI_DOGADAJ_JUTRO) | (1U << SUNCEVI_DOGADAJ_VECER);
 constexpr uint8_t MASKA_BLAGDANSKOG_SLAVLJENJA = 0x07;
 constexpr uint8_t MASKA_BLAGDANSKIH_RAZDOBLJA = 0x07;
 constexpr uint8_t ZASTAVICA_OBRNUTE_LOGIKE_IZLAZNIH_RELEJA = 0x20;
@@ -91,6 +93,8 @@ struct RadnePostavke {
   bool nocnaRasvjetaOmogucena;
   uint8_t zvonaSuncevihDogadaja[SUNCEVI_DOGADAJ_BROJ];
   int16_t odgodeSuncevihDogadajaMin[SUNCEVI_DOGADAJ_BROJ];
+  uint8_t rucnaVremenaSuncevihDogadajaMaska;
+  uint16_t rucneMinuteSuncevihDogadaja[SUNCEVI_DOGADAJ_BROJ];
   NepomicniBlagdanRadno nepomicniBlagdani[BROJ_NEPOMICNIH_BLAGDANA];
   PomicniBlagdanRadno pomicniBlagdani[BROJ_POMICNIH_BLAGDANA];
   bool dnevnaMisaOmogucena;
@@ -165,6 +169,9 @@ static EepromLayout::SunceviDogadajiSpremnik napraviZadaneSunceveDogadaje() {
     0,
     {1, 1, 1},
     {-20, 0, 20},
+    0,
+    0,
+    {6 * 60, 12 * 60, 18 * 60},
     0
   };
   return zadani;
@@ -212,6 +219,10 @@ static bool jeValjanSuncevDogadaj(uint8_t dogadaj) {
   return dogadaj < SUNCEVI_DOGADAJ_BROJ;
 }
 
+static bool podrzavaRucnoVrijemeSuncevogDogadaja(uint8_t dogadaj) {
+  return dogadaj == SUNCEVI_DOGADAJ_JUTRO || dogadaj == SUNCEVI_DOGADAJ_VECER;
+}
+
 static bool jeValjanoBlagdanskoRazdoblje(uint8_t razdoblje) {
   return razdoblje < BLAGDAN_RAZDOBLJE_BROJ;
 }
@@ -238,6 +249,20 @@ static int16_t ogranicenaOdgodaSuncevogDogadajaMin(int odgodaMin) {
 
 static uint8_t sanitizirajMaskuSuncevihDogadaja(uint8_t maska) {
   return maska & MASKA_SUNCEVIH_DOGADAJA;
+}
+
+static uint8_t sanitizirajMaskuRucnihSuncevihVremena(uint8_t maska) {
+  return maska & MASKA_RUCNIH_SUNCEVIH_VREMENA;
+}
+
+static uint16_t normalizirajMinuteUDanuZaPostavke(int minute) {
+  while (minute < 0) {
+    minute += 1440;
+  }
+  while (minute >= 1440) {
+    minute -= 1440;
+  }
+  return static_cast<uint16_t>(minute);
 }
 
 static uint8_t sanitizirajMaskuBlagdanskogSlavljenja(uint8_t maska) {
@@ -787,6 +812,18 @@ static bool sanitizirajSunceveDogadajeSpremnik(EepromLayout::SunceviDogadajiSpre
     trebaSpremiti = true;
   }
 
+  const uint8_t novaMaskaRucnihVremena =
+      sanitizirajMaskuRucnihSuncevihVremena(spremnik.rucnaVremenaMaska);
+  if (novaMaskaRucnihVremena != spremnik.rucnaVremenaMaska) {
+    spremnik.rucnaVremenaMaska = novaMaskaRucnihVremena;
+    trebaSpremiti = true;
+  }
+
+  if (spremnik.reserved != 0) {
+    spremnik.reserved = 0;
+    trebaSpremiti = true;
+  }
+
   for (uint8_t i = 0; i < SUNCEVI_DOGADAJ_BROJ; ++i) {
     const uint8_t novoZvono = ogranicenoZvonoSuncevogDogadaja(spremnik.zvona[i]);
     if (novoZvono != spremnik.zvona[i]) {
@@ -798,6 +835,12 @@ static bool sanitizirajSunceveDogadajeSpremnik(EepromLayout::SunceviDogadajiSpre
         (i == SUNCEVI_DOGADAJ_PODNE) ? 0 : ogranicenaOdgodaSuncevogDogadajaMin(spremnik.odgodeMin[i]);
     if (novaOdgoda != spremnik.odgodeMin[i]) {
       spremnik.odgodeMin[i] = novaOdgoda;
+      trebaSpremiti = true;
+    }
+
+    const uint16_t noveMinute = normalizirajMinuteUDanuZaPostavke(spremnik.rucneMinute[i]);
+    if (noveMinute != spremnik.rucneMinute[i]) {
+      spremnik.rucneMinute[i] = noveMinute;
       trebaSpremiti = true;
     }
   }
@@ -823,6 +866,11 @@ static void ucitajSunceveDogadajeIzSpremnika(const EepromLayout::SunceviDogadaji
   memcpy(postavke.zvonaSuncevihDogadaja, spremnik.zvona, sizeof(postavke.zvonaSuncevihDogadaja));
   memcpy(
       postavke.odgodeSuncevihDogadajaMin, spremnik.odgodeMin, sizeof(postavke.odgodeSuncevihDogadajaMin));
+  postavke.rucnaVremenaSuncevihDogadajaMaska =
+      sanitizirajMaskuRucnihSuncevihVremena(spremnik.rucnaVremenaMaska);
+  memcpy(postavke.rucneMinuteSuncevihDogadaja,
+         spremnik.rucneMinute,
+         sizeof(postavke.rucneMinuteSuncevihDogadaja));
 }
 
 static void upisiSunceveDogadajeUSpremnik(EepromLayout::SunceviDogadajiSpremnik& spremnik) {
@@ -830,6 +878,12 @@ static void upisiSunceveDogadajeUSpremnik(EepromLayout::SunceviDogadajiSpremnik&
   spremnik.nocnaRasvjetaOmogucena = postavke.nocnaRasvjetaOmogucena;
   memcpy(spremnik.zvona, postavke.zvonaSuncevihDogadaja, sizeof(spremnik.zvona));
   memcpy(spremnik.odgodeMin, postavke.odgodeSuncevihDogadajaMin, sizeof(spremnik.odgodeMin));
+  spremnik.rucnaVremenaMaska =
+      sanitizirajMaskuRucnihSuncevihVremena(postavke.rucnaVremenaSuncevihDogadajaMaska);
+  spremnik.reserved = 0;
+  memcpy(spremnik.rucneMinute,
+         postavke.rucneMinuteSuncevihDogadaja,
+         sizeof(spremnik.rucneMinute));
 }
 
 static void spremiSunceveDogadajeSpremnik(EepromLayout::SunceviDogadajiSpremnik& spremnik) {
@@ -1135,6 +1189,10 @@ static void ucitajSunceveDogadaje() {
 
   if (!ucitano) {
     spremnik = napraviZadaneSunceveDogadaje();
+    trebaSpremiti = true;
+  }
+
+  if (spremnik.verzija != EepromLayout::SUNCEVI_DOGADAJI_VERZIJA) {
     trebaSpremiti = true;
   }
 
@@ -1533,6 +1591,20 @@ int dohvatiOdgoduSuncevogDogadajaMin(uint8_t dogadaj) {
   return ogranicenaOdgodaSuncevogDogadajaMin(postavke.odgodeSuncevihDogadajaMin[dogadaj]);
 }
 
+bool jeRucnoVrijemeSuncevogDogadajaOmoguceno(uint8_t dogadaj) {
+  if (!podrzavaRucnoVrijemeSuncevogDogadaja(dogadaj)) {
+    return false;
+  }
+  return (postavke.rucnaVremenaSuncevihDogadajaMaska & (1U << dogadaj)) != 0;
+}
+
+int dohvatiRucnoVrijemeSuncevogDogadajaMin(uint8_t dogadaj) {
+  if (!podrzavaRucnoVrijemeSuncevogDogadaja(dogadaj)) {
+    return 0;
+  }
+  return normalizirajMinuteUDanuZaPostavke(postavke.rucneMinuteSuncevihDogadaja[dogadaj]);
+}
+
 bool jeNocnaRasvjetaOmogucena() {
   return postavke.nocnaRasvjetaOmogucena;
 }
@@ -1658,6 +1730,20 @@ void postaviKocnicuZvonaOmoguceno(bool omoguceno) {
 }
 
 void postaviSuncevDogadaj(uint8_t dogadaj, bool omogucen, uint8_t zvono, int odgodaMin) {
+  postaviSuncevDogadaj(dogadaj,
+                       omogucen,
+                       zvono,
+                       odgodaMin,
+                       jeRucnoVrijemeSuncevogDogadajaOmoguceno(dogadaj),
+                       dohvatiRucnoVrijemeSuncevogDogadajaMin(dogadaj));
+}
+
+void postaviSuncevDogadaj(uint8_t dogadaj,
+                          bool omogucen,
+                          uint8_t zvono,
+                          int odgodaMin,
+                          bool rucnoVrijemeOmoguceno,
+                          int rucnoVrijemeMin) {
   if (!jeValjanSuncevDogadaj(dogadaj)) {
     return;
   }
@@ -1665,12 +1751,21 @@ void postaviSuncevDogadaj(uint8_t dogadaj, bool omogucen, uint8_t zvono, int odg
   const uint8_t novoZvono = ogranicenoZvonoSuncevogDogadaja(zvono);
   const int16_t novaOdgoda =
       (dogadaj == SUNCEVI_DOGADAJ_PODNE) ? 0 : ogranicenaOdgodaSuncevogDogadajaMin(odgodaMin);
+  const bool rucnoPodrzano = podrzavaRucnoVrijemeSuncevogDogadaja(dogadaj);
+  const bool novoRucnoVrijemeOmoguceno = rucnoPodrzano && rucnoVrijemeOmoguceno;
+  const uint16_t noveRucneMinute = rucnoPodrzano
+      ? normalizirajMinuteUDanuZaPostavke(rucnoVrijemeMin)
+      : 0;
   const uint8_t bitDogadaja = static_cast<uint8_t>(1U << dogadaj);
   const bool prethodnoOmogucen = (postavke.maskaSuncevihDogadaja & bitDogadaja) != 0;
+  const bool prethodnoRucnoVrijeme =
+      (postavke.rucnaVremenaSuncevihDogadajaMaska & bitDogadaja) != 0;
 
   if (prethodnoOmogucen == omogucen &&
       postavke.zvonaSuncevihDogadaja[dogadaj] == novoZvono &&
-      postavke.odgodeSuncevihDogadajaMin[dogadaj] == novaOdgoda) {
+      postavke.odgodeSuncevihDogadajaMin[dogadaj] == novaOdgoda &&
+      prethodnoRucnoVrijeme == novoRucnoVrijemeOmoguceno &&
+      postavke.rucneMinuteSuncevihDogadaja[dogadaj] == noveRucneMinute) {
     return;
   }
 
@@ -1683,6 +1778,14 @@ void postaviSuncevDogadaj(uint8_t dogadaj, bool omogucen, uint8_t zvono, int odg
       sanitizirajMaskuSuncevihDogadaja(postavke.maskaSuncevihDogadaja);
   postavke.zvonaSuncevihDogadaja[dogadaj] = novoZvono;
   postavke.odgodeSuncevihDogadajaMin[dogadaj] = novaOdgoda;
+  if (novoRucnoVrijemeOmoguceno) {
+    postavke.rucnaVremenaSuncevihDogadajaMaska |= bitDogadaja;
+  } else {
+    postavke.rucnaVremenaSuncevihDogadajaMaska &= static_cast<uint8_t>(~bitDogadaja);
+  }
+  postavke.rucnaVremenaSuncevihDogadajaMaska =
+      sanitizirajMaskuRucnihSuncevihVremena(postavke.rucnaVremenaSuncevihDogadajaMaska);
+  postavke.rucneMinuteSuncevihDogadaja[dogadaj] = noveRucneMinute;
 
   EepromLayout::SunceviDogadajiSpremnik spremnik = napraviZadaneSunceveDogadaje();
   if (!ucitajSunceveDogadajeSkeniranjem(spremnik)) {
@@ -1700,14 +1803,17 @@ void postaviSuncevDogadaj(uint8_t dogadaj, bool omogucen, uint8_t zvono, int odg
     naziv = "vecer";
   }
 
-  char log[96];
+  char log[120];
   snprintf_P(log,
              sizeof(log),
-             PSTR("Suncevi dogadaj %s: %s, zvono=%u, odgoda=%d min"),
+             PSTR("Suncevi dogadaj %s: %s, zvono=%u, odgoda=%d min, rucno=%u %02u:%02u"),
              naziv,
              jeSuncevDogadajOmogucen(dogadaj) ? "ON" : "OFF",
              dohvatiZvonoZaSuncevDogadaj(dogadaj),
-             dohvatiOdgoduSuncevogDogadajaMin(dogadaj));
+             dohvatiOdgoduSuncevogDogadajaMin(dogadaj),
+             jeRucnoVrijemeSuncevogDogadajaOmoguceno(dogadaj) ? 1U : 0U,
+             static_cast<unsigned>(dohvatiRucnoVrijemeSuncevogDogadajaMin(dogadaj) / 60),
+             static_cast<unsigned>(dohvatiRucnoVrijemeSuncevogDogadajaMin(dogadaj) % 60));
   posaljiPCLog(log);
 }
 
