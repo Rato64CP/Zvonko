@@ -20,6 +20,7 @@ Ova podmapa sadrzi glavni firmware projekta `ZVONKO v. 1.0` za `Arduino Mega 256
 - obrada RTC i NTP izvora vremena
 - degradirani nacin rada za `RTC` i `EEPROM` kad se kvar ponavlja
 - jedinstveni tihi rezim, BAT logika, lokalni overridei i webski virtualni toggle tihog moda
+- kratki `OFF/ON` ciklus fizickog kip-prekidaca tihog moda unutar `2 s` tijekom aktivnog mrtvackog zaustavlja mrtvacko bez automatskog ponovnog pokretanja
 - `UPS mod` s odvojenim ulazom za nadzor mreznog napona
 
 ## 🧭 Podjela poslova Mega / ESP

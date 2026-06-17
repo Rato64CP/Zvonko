@@ -7,17 +7,22 @@
 #include "otkucavanje.h"
 #include "pc_serial.h"
 #include "podesavanja_piny.h"
+#include "slavljenje_mrtvacko.h"
 #include "time_glob.h"
 #include "ups_nadzor.h"
 #include "zvonjenje.h"
 
 namespace {
 
+constexpr unsigned long TIHI_MRTVACKO_PREKID_MAX_MS = 2000UL;
+
 bool tihiRezimAktivan = false;
 bool rucniPrekidacTisineAktivan = false;
 bool webTihiRezimAktivan = false;
 bool rucnoPrisilnoIskljucenjeTijekomUskrsa = false;
 bool uskrsnaTisinaAktivna = false;
+bool tihiMrtvackoPrekidProzorAktivan = false;
+unsigned long tihiMrtvackoPrekidPocetakMs = 0UL;
 
 void primijeniLampicuTihogRezima() {
   digitalWrite(PIN_LAMPICA_TIHI_REZIM, (tihiRezimAktivan || jeUPSModAktivan()) ? HIGH : LOW);
@@ -25,6 +30,46 @@ void primijeniLampicuTihogRezima() {
 
 bool procitajFizickoStanjePrekidacaTisine() {
   return digitalRead(PIN_PREKIDAC_TISINE) == LOW;
+}
+
+void ponistiTihiPrekidMrtvackog() {
+  tihiMrtvackoPrekidProzorAktivan = false;
+  tihiMrtvackoPrekidPocetakMs = 0UL;
+}
+
+void obradiFizickiPrekidacKaoPrekidMrtvackog(bool fizickiTihiAktivan, unsigned long sadaMs) {
+  if (!jeMrtvackoUTijeku()) {
+    ponistiTihiPrekidMrtvackog();
+    return;
+  }
+
+  if (!fizickiTihiAktivan) {
+    tihiMrtvackoPrekidProzorAktivan = true;
+    tihiMrtvackoPrekidPocetakMs = sadaMs;
+    return;
+  }
+
+  if (!tihiMrtvackoPrekidProzorAktivan) {
+    return;
+  }
+
+  const unsigned long trajanjeIskljucenjaMs = sadaMs - tihiMrtvackoPrekidPocetakMs;
+  if (trajanjeIskljucenjaMs <= TIHI_MRTVACKO_PREKID_MAX_MS) {
+    zaustaviMrtvacko();
+    posaljiPCLog(F("Prekidac tisina: kratki OFF/ON zaustavio mrtvacko"));
+  }
+  ponistiTihiPrekidMrtvackog();
+}
+
+void ponistiIstekliTihiPrekidMrtvackog(unsigned long sadaMs) {
+  if (!tihiMrtvackoPrekidProzorAktivan) {
+    return;
+  }
+
+  if (!jeMrtvackoUTijeku() ||
+      sadaMs - tihiMrtvackoPrekidPocetakMs > TIHI_MRTVACKO_PREKID_MAX_MS) {
+    ponistiTihiPrekidMrtvackog();
+  }
 }
 
 void primijeniJedinstveniTihiRezim(bool inicijalno) {
@@ -66,12 +111,14 @@ void inicijalizirajPrekidacTisine() {
 }
 
 void osvjeziPrekidacTisine() {
+  const unsigned long sadaMs = millis();
   SwitchState novoStanje = SWITCH_RELEASED;
   if (obradiDebouncedInput(PIN_PREKIDAC_TISINE, 30, &novoStanje)) {
     // Fizicki kip prekidac postaje autoritet nad rucnim tihim modom
     // i gasi prethodno webom zadanu virtualnu blokadu toranjskog sata.
     webTihiRezimAktivan = false;
     rucniPrekidacTisineAktivan = (novoStanje == SWITCH_PRESSED);
+    obradiFizickiPrekidacKaoPrekidMrtvackog(rucniPrekidacTisineAktivan, sadaMs);
     if (rucniPrekidacTisineAktivan) {
       rucnoPrisilnoIskljucenjeTijekomUskrsa = false;
       posaljiPCLog(F("Prekidac tisina: UKLJUCEN"));
@@ -82,6 +129,8 @@ void osvjeziPrekidacTisine() {
                        : F("Prekidac tisina: ISKLJUCEN"));
     }
   }
+
+  ponistiIstekliTihiPrekidMrtvackog(sadaMs);
 
   const bool novaUskrsnaTisina = jeUskrsnaTisinaAktivna(dohvatiTrenutnoVrijeme());
   if (novaUskrsnaTisina != uskrsnaTisinaAktivna) {

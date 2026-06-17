@@ -168,6 +168,8 @@ Tihi rezim moze doci iz:
 - uskrsne tisine
 - web togglea `TIHI MOD`
 
+Ako mrtvacko trenutno zvoni, moze se zaustaviti i fizickim kip-prekidacem tihog moda: ugasi ga kratko pa ga ponovno upali unutar otprilike `2 s`. To samo zaustavlja mrtvacko; ne pokrece ga ponovno bez novog pritiska tipke `MRTVO` ili nove naredbe.
+
 ## 🚨 Greske i oporavak
 
 Najvaznije poruke:

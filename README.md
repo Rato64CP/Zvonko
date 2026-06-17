@@ -127,6 +127,7 @@
 - jedinstveni tihi rezim moze se aktivirati uskrsnom tisinom, rucnim kip-prekidacem ili webskim virtualnim toggleom na `ESP` dashboardu
 - lampica tihog moda svijetli samo kad je stvarno aktivan konacni tihi rezim
 - tihi rezim blokira zvona, cekice, slavljenje i mrtvacko, ali ne zaustavlja kazaljke ni okretnu plocu
+- tijekom aktivnog mrtvackog fizicki kip-prekidac tihog moda moze se kratko ugasiti pa ponovno upaliti unutar `2 s`; to zaustavlja mrtvacko i ne pokrece ga ponovno bez nove naredbe
 - `UPS mod` pali lampicu tihog moda i na LCD-u prikazuje `NEMA STRUJE!` dok mehanika toranjskog sata radi samo s pomocnog napajanja
 - `BAT od/do` oznacava raspon u kojem je redovno otkucavanje dopusteno
 - izvan `BAT od/do` raspona redovno otkucavanje je blokirano, ali zvona, sunceva automatika i okretna ploca nastavljaju raditi
