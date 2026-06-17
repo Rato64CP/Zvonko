@@ -200,10 +200,10 @@ uint32_t odrediSatniKljucNTPZahtjeva(const DateTime& sada) {
 bool parsirajISOVrijeme(const char* iso, DateTime& lokalniDt, uint16_t& lokalneMs) {
   const int osnovnaDuljina = 19;
   const size_t duljina = strlen(iso);
-  const bool imaZuluneSufiks = (duljina == 20 && iso[19] == 'Z') ||
-                               (duljina == 24 && iso[23] == 'Z');
+  const bool imaZuluSufiks = (duljina == 20 && iso[19] == 'Z') ||
+                             (duljina == 24 && iso[23] == 'Z');
   const size_t osnovnaDuljinaBezZ =
-      imaZuluneSufiks ? (duljina - 1U) : duljina;
+      imaZuluSufiks ? (duljina - 1U) : duljina;
 
   if (!(osnovnaDuljinaBezZ == osnovnaDuljina || osnovnaDuljinaBezZ == 23U)) return false;
   if (iso[4] != '-' || iso[7] != '-' || iso[10] != 'T' ||

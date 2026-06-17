@@ -134,10 +134,5 @@ bool sanitizirajMreznaPolja(EepromLayout::PostavkeSpremnik& spremnik) {
     spremnik.wifiOmogucen = true;
     biloPromjena = true;
   }
-  if (spremnik.rezerviranoSerijskaVeza) {
-    spremnik.rezerviranoSerijskaVeza = false;
-    biloPromjena = true;
-  }
-
   return biloPromjena;
 }

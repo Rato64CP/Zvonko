@@ -9,6 +9,8 @@
 #include "postavke.h"
 #include "pc_serial.h"
 #include "debouncing.h"
+#include "izlazni_releji.h"
+#include "otkucavanje_interno.h"
 
 // ==================== CONSTANTS ====================
 
@@ -192,6 +194,18 @@ static void pokreniInercijuZvona(int indeks) {
   inercija.trajanje_ms[indeks] = dohvatiTrajanjeInercijeZvonaMs(indeks);
 }
 
+static void ugasiZvonoZbogGlobalneBlokade(int indeks) {
+  if (!jeValjanIndeksZvona(indeks) || !zvona.aktivan[indeks]) {
+    return;
+  }
+
+  deaktivirajBell_Relej(indeks);
+  pokreniInercijuZvona(indeks);
+  zvona.aktivan[indeks] = false;
+  zvona.start_ms[indeks] = 0UL;
+  zvona.duration_ms[indeks] = 0UL;
+}
+
 static void zaustaviInercijuZvona(int indeks) {
   if (!jeValjanIndeksZvona(indeks)) {
     return;
@@ -233,10 +247,11 @@ static void aktivirajBell_Relej(int indeks) {
     return;
   }
 
+  prekiniAktivnoOtkucavanjeZbogPosebnogNacina(F("zvono preuzima prioritet nad otkucavanjem"));
   // Zvona imaju prioritet nad posebnim nacinima cekica toranjskog sata.
   prekiniPosebneNacineZbogZvona(indeks);
   zaustaviInercijuZvona(indeks);
-  digitalWrite(PINOVI_ZVONA[indeks], HIGH);
+  postaviIzlazniRelej(PINOVI_ZVONA[indeks], true);
   osvjeziLampicuZvona(indeks, millis());
 
   char log[40];
@@ -253,7 +268,7 @@ static void deaktivirajBell_Relej(int indeks) {
     return;
   }
 
-  digitalWrite(PINOVI_ZVONA[indeks], LOW);
+  postaviIzlazniRelej(PINOVI_ZVONA[indeks], false);
   osvjeziLampicuZvona(indeks, millis());
   char log[32];
   snprintf_P(log, sizeof(log), PSTR("Zvono%d: deaktivirana"), indeks + 1);
@@ -683,14 +698,7 @@ static void primijeniEfektivnuGlobalnuBlokaduZvona(bool prethodnoAktivna) {
     ponistiCekanjeSinkroniziranogGasenja();
     ponistiProduzeniZavrsetakBezKocnice();
     for (uint8_t i = 0; i < BROJ_ZVONA_MAX; ++i) {
-      if (!zvona.aktivan[i]) {
-        continue;
-      }
-
-      deaktivirajBell_Relej(i);
-      zvona.aktivan[i] = false;
-      zvona.start_ms[i] = 0UL;
-      zvona.duration_ms[i] = 0UL;
+      ugasiZvonoZbogGlobalneBlokade(i);
     }
     osvjeziLampiceZvona(millis());
     posaljiPCLog(F("Globalna blokada zvona: UKLJUCENA"));
@@ -734,7 +742,7 @@ void postaviBlokaduZvonaUPS(bool blokiraj) {
 void inicijalizirajZvona() {
   for (uint8_t i = 0; i < BROJ_ZVONA_MAX; i++) {
     pinMode(PINOVI_ZVONA[i], OUTPUT);
-    digitalWrite(PINOVI_ZVONA[i], LOW);
+    postaviIzlazniRelej(PINOVI_ZVONA[i], false);
     pinMode(PINOVI_LAMPICA_ZVONA[i], OUTPUT);
     digitalWrite(PINOVI_LAMPICA_ZVONA[i], LOW);
     zvona.aktivan[i] = false;
@@ -805,12 +813,7 @@ void upravljajZvonom() {
     ponistiCekanjeSinkroniziranogGasenja();
     ponistiProduzeniZavrsetakBezKocnice();
     for (uint8_t i = 0; i < BROJ_ZVONA_MAX; ++i) {
-      if (zvona.aktivan[i]) {
-        deaktivirajBell_Relej(i);
-        zvona.aktivan[i] = false;
-        zvona.start_ms[i] = 0UL;
-        zvona.duration_ms[i] = 0UL;
-      }
+      ugasiZvonoZbogGlobalneBlokade(i);
     }
 
     jeLiInerciaAktivna();

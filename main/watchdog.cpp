@@ -4,6 +4,7 @@
 #include "watchdog.h"
 #include "podesavanja_piny.h"
 #include "pc_serial.h"
+#include "izlazni_releji.h"
 
 // ==================== WATCHDOG SETUP ====================
 
@@ -12,8 +13,8 @@ static bool reset_zastavice_ucitane = false;
 static bool watchdog_inicijaliziran = false;
 
 static void postaviCekiceUSigurnoStanjePrijeReseta() {
-  digitalWrite(PIN_CEKIC_MUSKI, LOW);
-  digitalWrite(PIN_CEKIC_ZENSKI, LOW);
+  postaviIzlazniRelej(PIN_CEKIC_MUSKI, false);
+  postaviIzlazniRelej(PIN_CEKIC_ZENSKI, false);
   pinMode(PIN_CEKIC_MUSKI, OUTPUT);
   pinMode(PIN_CEKIC_ZENSKI, OUTPUT);
 }

@@ -10,6 +10,7 @@
 #include "unified_motion_state.h"
 #include "watchdog.h"
 #include "ups_nadzor.h"
+#include "izlazni_releji.h"
 
 namespace {
 constexpr int BROJ_MINUTA_CIKLUS = 720;
@@ -51,8 +52,8 @@ void posaljiLogKazaljkiNormalniRestart(uint16_t pozicija) {
 }
 
 void ugasiRelejeKazaljki() {
-  digitalWrite(PIN_RELEJ_PARNE_KAZALJKE, LOW);
-  digitalWrite(PIN_RELEJ_NEPARNE_KAZALJKE, LOW);
+  postaviIzlazniRelej(PIN_RELEJ_PARNE_KAZALJKE, false);
+  postaviIzlazniRelej(PIN_RELEJ_NEPARNE_KAZALJKE, false);
 }
 
 bool jeAutomatikaKazaljkiBlokirana() {
@@ -110,9 +111,9 @@ void aktivirajRelejeKazaljki(const EepromLayout::UnifiedMotionState& stanje) {
   // redoslijedu: prvo oba OFF, pa tek onda trazeni relej ON.
   ugasiRelejeKazaljki();
   if (stanje.hand_relay == HAND_RELEJ_PARNI) {
-    digitalWrite(PIN_RELEJ_PARNE_KAZALJKE, HIGH);
+    postaviIzlazniRelej(PIN_RELEJ_PARNE_KAZALJKE, true);
   } else if (stanje.hand_relay == HAND_RELEJ_NEPARNI) {
-    digitalWrite(PIN_RELEJ_NEPARNE_KAZALJKE, HIGH);
+    postaviIzlazniRelej(PIN_RELEJ_NEPARNE_KAZALJKE, true);
   }
 }
 
@@ -132,7 +133,10 @@ void obradiJedanKorak(EepromLayout::UnifiedMotionState& stanje) {
     stanje.hand_relay = HAND_RELEJ_NIJEDAN;
     aktivniKorakStartRtcTick = 0;
     aktivirajRelejeKazaljki(stanje);
-    UnifiedMotionStateStore::spremiAkoPromjena(stanje);
+    if (!UnifiedMotionStateStore::spremiAkoPromjena(stanje)) {
+      UnifiedMotionStateStore::postaviPrivremenoRadnoStanje(stanje);
+      posaljiPCLog(F("Kazaljke: zavrsni EEPROM/FRAM zapis nije potvrden, zadrzavam sigurno radno stanje"));
+    }
     posaljiPCLog(F("Kazaljke: korak dovrsen po RTC SQW taktu"));
     UnifiedMotionStateStore::logirajStanje(stanje);
   }
@@ -211,7 +215,9 @@ void inicijalizirajKazaljke() {
     // jer je toranjski sat u meduvremenu izgubio stvarno trajanje tog koraka.
     stanje.hand_active = HAND_NEAKTIVNO;
     stanje.hand_relay = HAND_RELEJ_NIJEDAN;
-    UnifiedMotionStateStore::spremiAkoPromjena(stanje);
+    if (!UnifiedMotionStateStore::spremiAkoPromjena(stanje)) {
+      UnifiedMotionStateStore::postaviPrivremenoRadnoStanje(stanje);
+    }
     posaljiPCLog(F("Kazaljke: pronaden aktivni impuls iz stare sesije, vracam u mirno stanje"));
   }
   // Vazno za recovery toranjskog sata: pri restartu zadrzavamo EEPROM
@@ -246,7 +252,9 @@ void upravljajKorekcijomKazaljki() {
       stanje.hand_active = HAND_NEAKTIVNO;
       stanje.hand_relay = HAND_RELEJ_NIJEDAN;
       aktivniKorakStartRtcTick = 0;
-      UnifiedMotionStateStore::spremiAkoPromjena(stanje);
+      if (!UnifiedMotionStateStore::spremiAkoPromjena(stanje)) {
+        UnifiedMotionStateStore::postaviPrivremenoRadnoStanje(stanje);
+      }
       ugasiRelejeKazaljki();
       posaljiPCLog(F("Kazaljke: RTC SQW nije aktivan, gasim aktivni impuls bez pomaka"));
     }
@@ -258,7 +266,9 @@ void upravljajKorekcijomKazaljki() {
       stanje.hand_active = HAND_NEAKTIVNO;
       stanje.hand_relay = HAND_RELEJ_NIJEDAN;
       aktivniKorakStartRtcTick = 0;
-      UnifiedMotionStateStore::spremiAkoPromjena(stanje);
+      if (!UnifiedMotionStateStore::spremiAkoPromjena(stanje)) {
+        UnifiedMotionStateStore::postaviPrivremenoRadnoStanje(stanje);
+      }
       if (rucnaBlokadaKazaljki) {
         posaljiPCLog(F("Kazaljke: automatika rucno blokirana za namjestanje"));
       } else if (jeUPSModAktivan()) {
@@ -309,7 +319,9 @@ void postaviRucnuBlokaduKazaljki(bool blokirano) {
   if (blokirano) {
     stanje.hand_active = HAND_NEAKTIVNO;
     stanje.hand_relay = HAND_RELEJ_NIJEDAN;
-    UnifiedMotionStateStore::spremiAkoPromjena(stanje);
+    if (!UnifiedMotionStateStore::spremiAkoPromjena(stanje)) {
+      UnifiedMotionStateStore::postaviPrivremenoRadnoStanje(stanje);
+    }
     ugasiRelejeKazaljki();
     posaljiPCLog(F("Kazaljke: ukljucena rucna blokada za namjestanje"));
   } else {
@@ -343,7 +355,9 @@ void postaviRucnuPozicijuKazaljki(int satKazaljke, int minutaKazaljke) {
   stanje.hand_relay = HAND_RELEJ_NIJEDAN;
   aktivniKorakStartRtcTick = 0;
   aktivirajRelejeKazaljki(stanje);
-  UnifiedMotionStateStore::spremiAkoPromjena(stanje);
+  if (!UnifiedMotionStateStore::spremiAkoPromjena(stanje)) {
+    UnifiedMotionStateStore::postaviPrivremenoRadnoStanje(stanje);
+  }
   pokreniBudnoKorekciju();
 }
 
@@ -382,6 +396,8 @@ void postaviTrenutniPolozajKazaljki(int trenutnaMinuta) {
   stanje.hand_active = HAND_NEAKTIVNO;
   stanje.hand_relay = HAND_RELEJ_NIJEDAN;
   aktivniKorakStartRtcTick = 0;
-  UnifiedMotionStateStore::spremiAkoPromjena(stanje);
+  if (!UnifiedMotionStateStore::spremiAkoPromjena(stanje)) {
+    UnifiedMotionStateStore::postaviPrivremenoRadnoStanje(stanje);
+  }
 }
 

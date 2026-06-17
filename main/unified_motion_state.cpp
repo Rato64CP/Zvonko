@@ -19,6 +19,7 @@ constexpr uint8_t UNIFIED_VERZIJA = EepromLayout::UNIFIED_STANJE_VERZIJA;
 constexpr uint8_t RESERVED_SEKVENCA_POCETNA = 1;
 
 bool cacheInicijaliziran = false;
+bool cacheSadrziNespremljenuPromjenu = false;
 int cacheSlot = -1;
 EepromLayout::UnifiedMotionState cacheStanje{};
 
@@ -202,7 +203,9 @@ EepromLayout::UnifiedMotionState dohvatiIliInicijaliziraj() {
 }
 
 bool spremiAkoPromjena(const EepromLayout::UnifiedMotionState& stanje) {
-  if (cacheInicijaliziran && jednakoLogickoStanje(cacheStanje, stanje)) {
+  if (cacheInicijaliziran &&
+      !cacheSadrziNespremljenuPromjenu &&
+      jednakoLogickoStanje(cacheStanje, stanje)) {
     return true;
   }
 
@@ -236,8 +239,27 @@ bool spremiAkoPromjena(const EepromLayout::UnifiedMotionState& stanje) {
   }
   cacheStanje = stanjeZaSpremanje;
   cacheInicijaliziran = true;
+  cacheSadrziNespremljenuPromjenu = false;
   cacheSlot = sljedeciSlot;
   return true;
+}
+
+void postaviPrivremenoRadnoStanje(const EepromLayout::UnifiedMotionState& stanje) {
+  EepromLayout::UnifiedMotionState radnoStanje = stanje;
+  radnoStanje.version = UNIFIED_VERZIJA;
+  radnoStanje.reserved =
+      cacheInicijaliziran ? cacheStanje.reserved : RESERVED_SEKVENCA_POCETNA;
+  radnoStanje.checksum = izracunajChecksum(radnoStanje);
+
+  // Koristi se samo kad je fizicki korak vec doveden u sigurno stanje, ali
+  // FRAM/EEPROM zapis nije prosao. Runtime mora znati stvarno stanje mehanike,
+  // dok zastavica ispod sprjecava da se neuspjeli zapis proglasi trajnim.
+  cacheStanje = radnoStanje;
+  cacheInicijaliziran = true;
+  cacheSadrziNespremljenuPromjenu = true;
+  if (cacheSlot < 0) {
+    cacheSlot = 0;
+  }
 }
 
 void logirajStanje(const EepromLayout::UnifiedMotionState& stanje) {

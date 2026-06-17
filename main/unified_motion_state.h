@@ -8,6 +8,7 @@ namespace UnifiedMotionStateStore {
 bool ucitaj(EepromLayout::UnifiedMotionState& stanje);
 EepromLayout::UnifiedMotionState dohvatiIliInicijaliziraj();
 bool spremiAkoPromjena(const EepromLayout::UnifiedMotionState& stanje);
+void postaviPrivremenoRadnoStanje(const EepromLayout::UnifiedMotionState& stanje);
 void logirajStanje(const EepromLayout::UnifiedMotionState& stanje);
 
 }  // namespace UnifiedMotionStateStore

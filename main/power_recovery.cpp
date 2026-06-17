@@ -272,7 +272,7 @@ static void obradiWatchdogSafeModePriBootu() {
 
   stanje.zadnjiWatchdogUnix = sadaUnix;
 
-  if (stanje.brojWatchdogResetova >
+  if (stanje.brojWatchdogResetova >=
       PowerRecoveryLayout::WATCHDOG_RESET_LOCKDOWN_PRAG) {
     stanje.lockdownAktivan = 1;
     safe_mode_aktivan = true;
@@ -358,12 +358,16 @@ void odradiBootRecovery() {
     if (jedinstvenoStanje.hand_active != PowerRecoveryLayout::HAND_NEAKTIVNO) {
       jedinstvenoStanje.hand_active = PowerRecoveryLayout::HAND_NEAKTIVNO;
       jedinstvenoStanje.hand_relay = PowerRecoveryLayout::HAND_RELEJ_NIJEDAN;
-      UnifiedMotionStateStore::spremiAkoPromjena(jedinstvenoStanje);
+      if (!UnifiedMotionStateStore::spremiAkoPromjena(jedinstvenoStanje)) {
+        UnifiedMotionStateStore::postaviPrivremenoRadnoStanje(jedinstvenoStanje);
+      }
       posaljiPCLog(F("Power Recovery: Prekinuti impuls kazaljki vracen u mirno stanje iz iste pozicije"));
     }
     if (jedinstvenoStanje.plate_phase != PowerRecoveryLayout::PLATE_FAZA_STABILNO) {
       jedinstvenoStanje.plate_phase = PowerRecoveryLayout::PLATE_FAZA_STABILNO;
-      UnifiedMotionStateStore::spremiAkoPromjena(jedinstvenoStanje);
+      if (!UnifiedMotionStateStore::spremiAkoPromjena(jedinstvenoStanje)) {
+        UnifiedMotionStateStore::postaviPrivremenoRadnoStanje(jedinstvenoStanje);
+      }
       posaljiPCLog(F("Power Recovery: Prekinuti korak ploce vracen u mirno stanje iz iste pozicije"));
     }
     posaljiPCLog(F("Power Recovery: Zadrzavam novije jedinstveno stanje kretanja"));

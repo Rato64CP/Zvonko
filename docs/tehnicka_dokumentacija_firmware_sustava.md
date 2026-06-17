@@ -240,6 +240,8 @@ Primjer:
 
 Ako je jutarnje suncevo zvono odradeno, ono moze otvoriti otkucavanje i prije regularnog kraja `BAT` raspona.
 
+U istoj skupini postavki bira se i vrsta pokojnickog zvona. Vrsta `1` zadrzava dosadasnje sekvence `POKOJNIK`/`POKOJNICA` iz `main/pogrebne_skripte.cpp`: pocetno zvono traje `2 minute`, zatim nakon inercije slijedi `MRTVACKO` `10 minuta`. Vrsta `2` produljuje pogrebnu sekvencu: `POKOJNIK` prvo pali oba zvona `2 minute`, `POKOJNICA` pali `ZENSKO` zvono `2 minute`, a nakon smirivanja inercije slijedi `MRTVACKO` `40 minuta`.
+
 ### Tihi rezim
 Jedinstveni tihi rezim blokira:
 - zvona

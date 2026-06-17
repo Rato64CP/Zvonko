@@ -7,7 +7,7 @@
 void inicijalizirajPogrebneSkripte();
 
 // Periodicki vodi sekvencu:
-// zvono 2 minute -> cekanje inercije -> mrtvacko 10 minuta.
+// pocetno zvono -> cekanje inercije -> mrtvacko prema odabranoj vrsti.
 void upravljajPogrebnimSkriptama(unsigned long sadaMs);
 
 // Ako je `POKOJNIK` vec aktivan, isti zahtjev ga zaustavlja.

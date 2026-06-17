@@ -28,19 +28,12 @@
 #include "prekidac_tisine.h"
 #include "ups_nadzor.h"
 #include "daljinski_433.h"
+#include "izlazni_releji.h"
 
 namespace {
 
 void inicijalizirajSigurnaPocetnaStanjaIzlaza() {
   const uint8_t izlazniPinovi[] = {
-      PIN_RELEJ_PARNE_KAZALJKE,
-      PIN_RELEJ_NEPARNE_KAZALJKE,
-      PIN_RELEJ_PARNE_PLOCE,
-      PIN_RELEJ_NEPARNE_PLOCE,
-      PIN_ZVONO_1,
-      PIN_ZVONO_2,
-      PIN_CEKIC_MUSKI,
-      PIN_CEKIC_ZENSKI,
       PIN_RELEJ_NOCNE_RASVJETE,
       PIN_LAMPICA_ZVONO_1,
       PIN_LAMPICA_ZVONO_2,
@@ -80,6 +73,7 @@ void setup() {
   }
   inicijalizirajRTC();
   ucitajPostavke();
+  inicijalizirajIzlazneReleje();
   primijeniLCDPozadinskoOsvjetljenje(jeLCDPozadinskoOsvjetljenjeUkljuceno());
   inicijalizirajUPSNadzor();
 

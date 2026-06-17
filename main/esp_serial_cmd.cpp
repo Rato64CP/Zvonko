@@ -1,5 +1,7 @@
 // esp_serial_cmd.cpp - CMD naredbe koje Mega prima preko ESP32 dashboarda
 #include "esp_serial_internal.h"
+#include "izlazni_releji.h"
+#include "otkucavanje_interno.h"
 
 ESPCmdIshod obradiESPCmdLiniju(const char* komanda) {
   bool uspjeh = true;
@@ -9,6 +11,7 @@ ESPCmdIshod obradiESPCmdLiniju(const char* komanda) {
   else if (strcmp(komanda, "ZVONO2_ON") == 0)       ukljuciZvono(2);
   else if (strcmp(komanda, "ZVONO2_OFF") == 0)      iskljuciZvono(2);
   else if (strcmp(komanda, "GASI_SVE") == 0) {
+    prekiniAktivnoOtkucavanjeZbogPosebnogNacina(F("GASI_SVE"));
     iskljuciObaZvonaSinkronizirano();
     zaustaviSlavljenje();
     zaustaviMrtvacko();
@@ -24,6 +27,14 @@ ESPCmdIshod obradiESPCmdLiniju(const char* komanda) {
   else if (strcmp(komanda, "POKOJNICA") == 0)       uspjeh = prebaciPokojnicu();
   else if (strcmp(komanda, "TIHI_ON") == 0)         postaviWebTihiRezim(true);
   else if (strcmp(komanda, "TIHI_OFF") == 0)        postaviWebTihiRezim(false);
+  else if (strcmp(komanda, "RELEJI_OBRNUTO_ON") == 0) {
+    postaviObrnutuLogikuIzlaznihReleja(true);
+    primijeniPolarnostIzlaznihReleja();
+  }
+  else if (strcmp(komanda, "RELEJI_OBRNUTO_OFF") == 0) {
+    postaviObrnutuLogikuIzlaznihReleja(false);
+    primijeniPolarnostIzlaznihReleja();
+  }
   else if (strcmp(komanda, "SUNCE_JUTRO_ON") == 0)
     postaviSuncevDogadaj(
         SUNCEVI_DOGADAJ_JUTRO,

@@ -29,6 +29,12 @@ enum IzvorVremena {
   IZ_NTP
 };
 
+enum RezultatProvjereSinkronizacije {
+  SINKRONIZACIJA_ODBIJENA = 0,
+  SINKRONIZACIJA_CEKA_DODATNU_POTVRDU = 1,
+  SINKRONIZACIJA_PRIHVACENA = 2
+};
+
 static IzvorVremena trenutniIzvor = IZ_RTC;
 static IzvorVremena zadnjiPotvrdeniIzvor = IZ_RTC;
 
@@ -76,6 +82,7 @@ static unsigned long sumnjivaSinkronizacijaMs = 0;
 static uint32_t zadnjiRtcTickSaSvjezimVremenom = 0;
 static uint32_t rtcZadnjiProcitaniUnix = 0;
 static uint32_t rtcZadnjiProcitaniTick = 0;
+static uint8_t rtcNenapredujeZaredom = 0;
 
 volatile uint32_t rtcSekundniBrojac = 0;
 
@@ -86,6 +93,7 @@ static const uint32_t MAX_RAZLIKA_IZMEDU_DVIJE_POTVRDE_S = 3UL;
 static const unsigned long ROK_SUMNJIVE_SINKRONIZACIJE_MS = 15UL * 60UL * 1000UL;
 static const uint8_t RTC_DEGRADED_PRAG_NEUSPJEHA = 3;
 static const uint8_t RTC_OPORAVAK_PRAG_USPJEHA = 3;
+static const uint8_t RTC_STALL_PRAG_NEUSPJEHA = 3;
 static const unsigned long RTC_REINICIJALIZACIJA_INTERVAL_MS = 5000UL;
 static uint8_t rtcNeuspjesiZaredom = 0;
 static uint8_t rtcUspjesiZaredom = 0;
@@ -148,7 +156,9 @@ static uint32_t izracunajPomakSekundiZaZakazaniNtp(unsigned long protekloMs,
                                                    uint16_t milisekundeNtp,
                                                    uint32_t minimalniPomakSekundi) {
   const unsigned long ukupnoMs = protekloMs + static_cast<unsigned long>(milisekundeNtp);
-  uint32_t pomakSekundi = ukupnoMs / 1000UL;
+  // DS3231 se upisuje samo na cijelu sekundu, zato NTP milisekunde
+  // zaokruzujemo umjesto da ih uvijek rezemo prema dolje.
+  uint32_t pomakSekundi = (ukupnoMs + 500UL) / 1000UL;
   if (pomakSekundi < minimalniPomakSekundi) {
     pomakSekundi = minimalniPomakSekundi;
   }
@@ -168,9 +178,18 @@ static bool pokusajUpisatiVrijemeURtc(const DateTime& novoVrijeme,
 
   rtc.adjust(novoVrijeme);
 
-  const DateTime potvrdaRtcVrijemena = rtc.now();
-  if (!jeVrijemeURasponuPouzdanosti(potvrdaRtcVrijemena) ||
-      apsolutnaRazlikaSekundi(potvrdaRtcVrijemena, novoVrijeme) > 1UL) {
+  bool upisPotvrden = false;
+  for (uint8_t pokusaj = 0; pokusaj < 2 && !upisPotvrden; ++pokusaj) {
+    const DateTime potvrdaRtcVrijemena = rtc.now();
+    upisPotvrden =
+        jeVrijemeURasponuPouzdanosti(potvrdaRtcVrijemena) &&
+        apsolutnaRazlikaSekundi(potvrdaRtcVrijemena, novoVrijeme) <= 1UL;
+    if (!upisPotvrden) {
+      delay(10);
+    }
+  }
+
+  if (!upisPotvrden) {
     evidentirajRtcNeuspjeh(porukaNeuspjeha);
     signalizirajError_RTC();
     return false;
@@ -491,6 +510,9 @@ static void uskladiPropusteniDSTPrijelazNakonBoota() {
   trenutnoVrijeme = korigiranoVrijeme;
   dstAktivan = kalendarskiDST;
   spremiDSTStatus();
+  obavijestiKazaljkeDSTPromjena(kalendarskiDST ? 60 : -60);
+  zatraziPoravnanjeTaktaKazaljki();
+  zatraziPoravnanjeTaktaPloce();
 
   posaljiPCLog(kalendarskiDST
                    ? F("DST: offline korekcija propustenog prijelaza na CEST (+60 min)")
@@ -596,12 +618,17 @@ static bool osvjeziTrenutnoVrijemeIzRtc() {
       rtcZadnjiProcitaniTick != 0 &&
       lokalniRtcTick != rtcZadnjiProcitaniTick) {
     if (rtcVrijemeUnix <= rtcZadnjiProcitaniUnix) {
-      postaviRtcIzlazniFailSafe(
-          true,
-          F("RTC fail-safe: SQW radi, ali RTC vrijeme ne napreduje; blokiram releje toranjskog sata"));
-      evidentirajRtcNeuspjeh(
-          F("RTC: SQW impulsi postoje, ali se procitano RTC vrijeme ne mijenja"));
-      signalizirajError_RTC();
+      if (rtcNenapredujeZaredom < 255U) {
+        ++rtcNenapredujeZaredom;
+      }
+      if (rtcNenapredujeZaredom >= RTC_STALL_PRAG_NEUSPJEHA) {
+        postaviRtcIzlazniFailSafe(
+            true,
+            F("RTC fail-safe: SQW radi, ali RTC vrijeme ne napreduje; blokiram releje toranjskog sata"));
+        evidentirajRtcNeuspjeh(
+            F("RTC: SQW impulsi postoje, ali se procitano RTC vrijeme ne mijenja"));
+        signalizirajError_RTC();
+      }
       return false;
     }
   }
@@ -609,6 +636,7 @@ static bool osvjeziTrenutnoVrijemeIzRtc() {
   trenutnoVrijeme = rtcVrijeme;
   rtcZadnjiProcitaniUnix = rtcVrijemeUnix;
   rtcZadnjiProcitaniTick = lokalniRtcTick;
+  rtcNenapredujeZaredom = 0;
   evidentirajRtcUspjeh();
   return true;
 }
@@ -627,6 +655,7 @@ static void postaviVrijemePotvrdjenoZaAutomatiku(bool potvrdeno, const __FlashSt
 static void resetirajRtcMonitorNapredovanja() {
   rtcZadnjiProcitaniUnix = 0;
   rtcZadnjiProcitaniTick = 0;
+  rtcNenapredujeZaredom = 0;
 }
 
 static void postaviRtcIzlazniFailSafe(bool aktivan, const __FlashStringHelper* razlog) {
@@ -799,15 +828,11 @@ DateTime dohvatiTrenutnoVrijeme() {
       if (zakazaniNtpRtcTick != 0 && lokalniRtcTick > zakazaniNtpRtcTick) {
         protekliRtcTickovi = lokalniRtcTick - zakazaniNtpRtcTick;
         protekloOdZakazanogMs = sadaMs - zakazaniNtpMs;
-        if (protekliRtcTickovi == 0) {
-          protekliRtcTickovi = 1;
-        }
         ntpSpremanZaPrimjenu = true;
       }
 
       if (ntpSpremanZaPrimjenu) {
-        const uint32_t minimalniPomakSekundi =
-            (protekliRtcTickovi > 0U) ? (protekliRtcTickovi - 1U) : 0U;
+        const uint32_t minimalniPomakSekundi = protekliRtcTickovi - 1U;
         const uint32_t precizniPomakSekundi =
             izracunajPomakSekundiZaZakazaniNtp(
                 protekloOdZakazanogMs,

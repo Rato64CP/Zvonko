@@ -63,7 +63,8 @@ void postaviKompaktnePostavkeOtkucavanja(int satOd,
                                          int satDo,
                                          uint8_t modOtkucavanja,
                                          uint8_t modSlavljenja,
-                                         uint8_t modMrtvackog);
+                                         uint8_t modMrtvackog,
+                                         uint8_t vrstaPokojnickogZvona);
 
 // Trajanja stapica i povezanih akcija toranjskog sata
 // Zvonjenje i slavljenje vracaju se i kao trajanja u ms za izvrsavanje,
@@ -102,9 +103,11 @@ bool koristiDhcpMreza();
 bool jeLCDPozadinskoOsvjetljenjeUkljuceno();
 bool jePCLogiranjeOmoguceno();
 bool imaKazaljkeSata();
+bool jeObrnutaLogikaIzlaznihReleja();
 uint8_t dohvatiModSlavljenja();
 uint8_t dohvatiModOtkucavanja();
 uint8_t dohvatiModMrtvackog();
+uint8_t dohvatiVrstuPokojnickogZvona();
 const char* dohvatiStatickuIP();
 const char* dohvatiMreznuMasku();
 const char* dohvatiZadaniGateway();
@@ -129,6 +132,7 @@ void postaviUPSModOmogucen(bool omogucen);
 void postaviKocnicuZvonaOmoguceno(bool omoguceno);
 void postaviLCDPozadinskoOsvjetljenje(bool ukljuceno);
 void postaviPCLogiranjeOmoguceno(bool omoguceno);
+void postaviObrnutuLogikuIzlaznihReleja(bool omoguceno);
 void postaviSuncevDogadaj(uint8_t dogadaj, bool omogucen, uint8_t zvono, int odgodaMin);
 void postaviNocnuRasvjetuOmoguceno(bool omoguceno);
 void postaviBlagdanskePostavke(uint8_t slavljenjeMaska, uint8_t razdobljaMaska);

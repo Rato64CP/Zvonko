@@ -111,7 +111,6 @@ Dodatno:
 Očekuje `application/x-www-form-urlencoded` polja:
 - `lcd`
 - `log`
-- `rs`
 - `ups`
 - `koc`
 - `inr1`
@@ -119,7 +118,7 @@ Očekuje `application/x-www-form-urlencoded` polja:
 - `imp`
 
 Pravila:
-- toggle polja `lcd`, `log`, `rs`, `ups`, `koc` moraju biti `0` ili `1`
+- toggle polja `lcd`, `log`, `ups`, `koc` moraju biti `0` ili `1`
 - `inr1` i `inr2` moraju biti cijeli brojevi `10-180`
 - `imp` mora biti cijeli broj `10-300` u koraku `10`
 - `ESP` šalje cijeli paket prema `Megi` kroz `SETCFG:SUSTAV|...`
@@ -130,6 +129,14 @@ Tipični statusi odgovora:
 - `400` nedostaje jedno ili više obaveznih polja
 - `422` neispravan unos ili je `Mega` odbila paket
 - `504` `Mega` nije odgovorila na zahtjev za spremanje
+
+## BAT i pokojnicko zvono
+
+`GET /api/settings/bat` vraca sate `sat_od`/`sat_do`, modove `otkucavanje_mode`, `slavljenje_mode`, `mrtvacko_mode` i `pokojnicko_type`.
+
+`POST /api/settings/bat` prima `od`, `do`, `otk`, `sl`, `mr` i opcionalno `pok`. Polje `pok` bira vrstu pokojnickog zvona koje zatim izvrsava `main/pogrebne_skripte.cpp` na `Megi`:
+- `1` zadrzava dosadasnje sekvence `POKOJNIK`/`POKOJNICA`
+- `2` koristi produljenu sekvencu u kojoj `POKOJNIK` prvo pali oba zvona `2 minute`, `POKOJNICA` pali `ZENSKO` zvono `2 minute`, a nakon inercije slijedi `MRTVACKO` `40 minuta`
 
 ## 📶 Setup WiFi API
 

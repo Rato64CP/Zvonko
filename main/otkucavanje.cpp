@@ -18,6 +18,7 @@
 #include "lcd_display.h"
 #include "pc_serial.h"
 #include "ups_nadzor.h"
+#include "izlazni_releji.h"
 
 namespace {
 
@@ -179,7 +180,7 @@ void aktivirajCekic_Internal(int pin,
     return;
   }
 
-  digitalWrite(pin, HIGH);
+  postaviIzlazniRelej(static_cast<uint8_t>(pin), true);
   sigurnostCekica.aktivan[indeks] = true;
   sigurnostCekica.vrijemeAktivacijeUs[indeks] = micros();
   sigurnostCekica.trajanjeUs[indeks] = pretvoriTrajanjeCekicaUMikrosekunde(
@@ -192,7 +193,7 @@ void deaktivirajCekic_Internal(int pin) {
     return;
   }
 
-  digitalWrite(pin, LOW);
+  postaviIzlazniRelej(static_cast<uint8_t>(pin), false);
   sigurnostCekica.aktivan[indeks] = false;
   sigurnostCekica.vrijemeAktivacijeUs[indeks] = 0UL;
   sigurnostCekica.trajanjeUs[indeks] = 0UL;
@@ -409,8 +410,8 @@ void otkucajPolasata() {
 void inicijalizirajOtkucavanje() {
   pinMode(PIN_CEKIC_MUSKI, OUTPUT);
   pinMode(PIN_CEKIC_ZENSKI, OUTPUT);
-  digitalWrite(PIN_CEKIC_MUSKI, LOW);
-  digitalWrite(PIN_CEKIC_ZENSKI, LOW);
+  postaviIzlazniRelej(PIN_CEKIC_MUSKI, false);
+  postaviIzlazniRelej(PIN_CEKIC_ZENSKI, false);
 
   otkucavanje.vrsta = OTKUCAVANJE_NONE;
   otkucavanje.preostaliUdarci = 0;

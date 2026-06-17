@@ -523,11 +523,16 @@ static void build_date_string() {
   last_date_minute = now.minute();
 }
 
-static void build_line2() {
+static void prikaziFlashPorukuDrugogRetka(PGM_P porukaFlash) {
+  char poruka[17];
+  FlashTekst::kopirajLiteral(poruka, sizeof(poruka), porukaFlash);
+  pripremiDrugiRedakZaLCD(poruka);
+}
+
+static bool pokusajPrikazatiLatchedEEPROMFault() {
   if (latched_eeprom_fault_active) {
     static bool prikaziPotvrdu = false;
     static unsigned long zadnjaIzmjenaPotvrdeMs = 0;
-    char poruka[17];
     const unsigned long sadaMs = millis();
 
     if (zadnjaIzmjenaPotvrdeMs == 0) {
@@ -537,18 +542,18 @@ static void build_line2() {
       prikaziPotvrdu = !prikaziPotvrdu;
     }
 
-    FlashTekst::kopirajLiteral(
-        poruka,
-        sizeof(poruka),
+    prikaziFlashPorukuDrugogRetka(
         prikaziPotvrdu ? LCD_PORUKA_LATCH_EEPROM_2 : LCD_PORUKA_LATCH_EEPROM_1);
-    pripremiDrugiRedakZaLCD(poruka);
-    return;
+    return true;
   }
 
+  return false;
+}
+
+static bool pokusajPrikazatiRtcDegradiraniNacin() {
   if (jeRtcDegradiraniNacinAktivan()) {
     static bool prikaziDruguRtcPoruku = false;
     static unsigned long zadnjaRtcPorukaMs = 0;
-    char poruka[17];
     const unsigned long sadaMs = millis();
 
     if (zadnjaRtcPorukaMs == 0) {
@@ -558,33 +563,38 @@ static void build_line2() {
       prikaziDruguRtcPoruku = !prikaziDruguRtcPoruku;
     }
 
-    FlashTekst::kopirajLiteral(
-        poruka,
-        sizeof(poruka),
+    prikaziFlashPorukuDrugogRetka(
         prikaziDruguRtcPoruku ? LCD_PORUKA_RTC_DEGRADED_2 : LCD_PORUKA_RTC_DEGRADED_1);
-    pripremiDrugiRedakZaLCD(poruka);
-    return;
+    return true;
   }
 
-  if (rtc_battery_warning_active) {
-    char poruka[17];
-    FlashTekst::kopirajLiteral(poruka, sizeof(poruka), LCD_PORUKA_BAT_RTC);
-    pripremiDrugiRedakZaLCD(poruka);
-    return;
+  return false;
+}
+
+static bool pokusajPrikazatiRtcBateriju() {
+  if (!rtc_battery_warning_active) {
+    return false;
   }
 
-  if (jeUPSModAktivan()) {
-    char poruka[17];
-    if (current_activity != ACTIVITY_ERROR) {
-      ocistiAktivnostDrugogRetka();
-    }
-    otkucavanje_poruka_aktivna = false;
-    hod_sata_prikaz_aktivan = false;
-    FlashTekst::kopirajLiteral(poruka, sizeof(poruka), LCD_PORUKA_UPS_NEMA_MREZE);
-      pripremiDrugiRedakZaLCD(poruka);
-    return;
+  prikaziFlashPorukuDrugogRetka(LCD_PORUKA_BAT_RTC);
+  return true;
+}
+
+static bool pokusajPrikazatiUPSMod() {
+  if (!jeUPSModAktivan()) {
+    return false;
   }
 
+  if (current_activity != ACTIVITY_ERROR) {
+    ocistiAktivnostDrugogRetka();
+  }
+  otkucavanje_poruka_aktivna = false;
+  hod_sata_prikaz_aktivan = false;
+  prikaziFlashPorukuDrugogRetka(LCD_PORUKA_UPS_NEMA_MREZE);
+  return true;
+}
+
+static bool pokusajPrikazatiSQWGresku() {
   if (jeRtcSqwGreskaAktivna()) {
     const unsigned long sadaMs = millis();
 
@@ -599,75 +609,78 @@ static void build_line2() {
     }
 
     if (lcd_sqw_greska_poruka_vidljiva) {
-      char poruka[17];
-      FlashTekst::kopirajLiteral(poruka, sizeof(poruka), LCD_PORUKA_SQW_GRESKA);
-      pripremiDrugiRedakZaLCD(poruka);
+      prikaziFlashPorukuDrugogRetka(LCD_PORUKA_SQW_GRESKA);
     } else {
       pripremiDrugiRedakZaLCD("");
     }
-    return;
+    return true;
   }
 
+  return false;
+}
+
+static void resetirajSQWGreskuAkoJeProsla() {
   lcd_sqw_greska_aktivna_prethodno = false;
   lcd_sqw_greska_poruka_vidljiva = true;
   lcd_sqw_greska_zadnje_treptanje_ms = 0;
+}
 
-  const bool zvono1Aktivno = jeZvonoAktivno(1);
-  const bool zvono2Aktivno = jeZvonoAktivno(2);
-
-  if (jeProduzeniZavrsetakZvonaBezKocniceAktivan()) {
-    char poruka[17];
-    FlashTekst::kopirajLiteral(poruka, sizeof(poruka), LCD_PORUKA_INERCIJA);
-    pripremiDrugiRedakZaLCD(poruka);
-    otkucavanje_poruka_aktivna = false;
-    hod_sata_prikaz_aktivan = false;
-    return;
+static bool pokusajPrikazatiProduzeniZavrsetakZvona() {
+  if (!jeProduzeniZavrsetakZvonaBezKocniceAktivan()) {
+    return false;
   }
 
-  // Prikaz zvona mora pratiti stvarno stanje releja toranjskog sata.
+  prikaziFlashPorukuDrugogRetka(LCD_PORUKA_INERCIJA);
+  otkucavanje_poruka_aktivna = false;
+  hod_sata_prikaz_aktivan = false;
+  return true;
+}
+
+static bool pokusajPrikazatiZvona(bool zvono1Aktivno, bool zvono2Aktivno) {
   if (current_activity == ACTIVITY_BELL1 || current_activity == ACTIVITY_BELL2 ||
       zvono1Aktivno || zvono2Aktivno) {
-    char poruka[17];
-
     if (zvono1Aktivno && zvono2Aktivno) {
-      FlashTekst::kopirajLiteral(poruka, sizeof(poruka), LCD_PORUKA_OBA_ZVONA);
-      pripremiDrugiRedakZaLCD(poruka);
-      return;
+      prikaziFlashPorukuDrugogRetka(LCD_PORUKA_OBA_ZVONA);
+      return true;
     }
 
     if (zvono1Aktivno) {
-      FlashTekst::kopirajLiteral(poruka, sizeof(poruka), LCD_PORUKA_BELL1);
-      pripremiDrugiRedakZaLCD(poruka);
-      return;
+      prikaziFlashPorukuDrugogRetka(LCD_PORUKA_BELL1);
+      return true;
     }
 
     if (zvono2Aktivno) {
-      FlashTekst::kopirajLiteral(poruka, sizeof(poruka), LCD_PORUKA_BELL2);
-      pripremiDrugiRedakZaLCD(poruka);
-      return;
+      prikaziFlashPorukuDrugogRetka(LCD_PORUKA_BELL2);
+      return true;
     }
 
     ocistiAktivnostDrugogRetka();
   }
 
-  // Dinamicka poruka za slavljenje mora pratiti stvarno stanje cekica.
+  return false;
+}
+
+static void uskladiAktivnostiPosebnihNacina() {
   if (current_activity == ACTIVITY_CELEBRATION && !jeSlavljenjeUTijeku()) {
     ocistiAktivnostDrugogRetka();
   }
 
-  // Dinamicka poruka za mrtvacko zvono mora nestati cim se nacin rada ugasi.
   if (current_activity == ACTIVITY_FUNERAL && !jeMrtvackoUTijeku()) {
     ocistiAktivnostDrugogRetka();
   }
+}
 
-  if (current_activity == ACTIVITY_NONE && jeLiInerciaAktivna()) {
-    char poruka[17];
-    FlashTekst::kopirajLiteral(poruka, sizeof(poruka), LCD_PORUKA_INERCIJA);
-    pripremiDrugiRedakZaLCD(poruka);
-    otkucavanje_poruka_aktivna = false;
-    return;
+static bool pokusajPrikazatiInerciju() {
+  if (current_activity != ACTIVITY_NONE || !jeLiInerciaAktivna()) {
+    return false;
   }
 
+  prikaziFlashPorukuDrugogRetka(LCD_PORUKA_INERCIJA);
+  otkucavanje_poruka_aktivna = false;
+  return true;
+}
+
+static bool pokusajPrikazatiWiFiDijagnostiku() {
   if (wifi_ip_prikaz_aktivan) {
     if ((millis() - wifi_ip_prikaz_pocetak_ms) >= WIFI_IP_PRIKAZ_TRAJANJE_MS) {
       wifi_ip_prikaz_aktivan = false;
@@ -675,48 +688,66 @@ static void build_line2() {
     } else if (current_activity != ACTIVITY_ERROR && !activity_is_error) {
       pripremiDrugiRedakZaLCD(wifi_ip_poruka);
       otkucavanje_poruka_aktivna = false;
-      return;
+      return true;
     }
   }
 
-  if (current_activity == ACTIVITY_NONE && jeOtkucavanjeUTijeku()) {
-    char poruka[17];
-    FlashTekst::kopirajLiteral(poruka, sizeof(poruka), LCD_PORUKA_OTKUCAJ);
-    pripremiDrugiRedakZaLCD(poruka);
-    otkucavanje_poruka_aktivna = true;
-    hod_sata_prikaz_aktivan = false;
-    return;
+  return false;
+}
+
+static bool pokusajPrikazatiOtkucavanje() {
+  if (current_activity != ACTIVITY_NONE || !jeOtkucavanjeUTijeku()) {
+    return false;
   }
 
+  prikaziFlashPorukuDrugogRetka(LCD_PORUKA_OTKUCAJ);
+  otkucavanje_poruka_aktivna = true;
+  hod_sata_prikaz_aktivan = false;
+  return true;
+}
+
+static void ocistiOtkucavanjeAkoJeZavrsilo() {
   if (current_activity == ACTIVITY_NONE && otkucavanje_poruka_aktivna && !jeOtkucavanjeUTijeku()) {
     otkucavanje_poruka_aktivna = false;
     last_date_minute = -1;
   }
+}
 
-  if (current_activity == ACTIVITY_NONE) {
-    int memoriraneMinute = 0;
-    if (trebaPrikazatiDugiHodSata(memoriraneMinute)) {
-      char poruka[17];
-      formatirajHodSata(memoriraneMinute, poruka, sizeof(poruka));
-      pripremiDrugiRedakZaLCD(poruka);
-      otkucavanje_poruka_aktivna = false;
-      hod_sata_prikaz_aktivan = true;
-      return;
-    }
+static bool pokusajPrikazatiHodSata() {
+  if (current_activity != ACTIVITY_NONE) {
+    return false;
   }
 
+  int memoriraneMinute = 0;
+  if (!trebaPrikazatiDugiHodSata(memoriraneMinute)) {
+    return false;
+  }
+
+  char poruka[17];
+  formatirajHodSata(memoriraneMinute, poruka, sizeof(poruka));
+  pripremiDrugiRedakZaLCD(poruka);
+  otkucavanje_poruka_aktivna = false;
+  hod_sata_prikaz_aktivan = true;
+  return true;
+}
+
+static void ocistiHodSataAkoJeZavrsio() {
   if (hod_sata_prikaz_aktivan) {
     hod_sata_prikaz_aktivan = false;
     last_date_minute = -1;
   }
+}
 
+static void osvjeziTimeoutAktivnostiDrugogRetka() {
   if (current_activity != ACTIVITY_NONE && activity_timeout_ms > 0) {
     unsigned long elapsed = millis() - activity_start_time;
     if (elapsed >= activity_timeout_ms) {
       ocistiAktivnostDrugogRetka();
     }
   }
+}
 
+static void prikaziAktivnostIliDatum() {
   if (current_activity != ACTIVITY_NONE) {
     if (activity_is_error) {
       unsigned long now = millis();
@@ -740,6 +771,35 @@ static void build_line2() {
       build_date_string();
     }
   }
+}
+
+static void build_line2() {
+  if (pokusajPrikazatiLatchedEEPROMFault()) return;
+  if (pokusajPrikazatiRtcDegradiraniNacin()) return;
+  if (pokusajPrikazatiRtcBateriju()) return;
+  if (pokusajPrikazatiUPSMod()) return;
+  if (pokusajPrikazatiSQWGresku()) return;
+
+  resetirajSQWGreskuAkoJeProsla();
+
+  const bool zvono1Aktivno = jeZvonoAktivno(1);
+  const bool zvono2Aktivno = jeZvonoAktivno(2);
+
+  if (pokusajPrikazatiProduzeniZavrsetakZvona()) return;
+  // Prikaz zvona mora pratiti stvarno stanje releja toranjskog sata.
+  if (pokusajPrikazatiZvona(zvono1Aktivno, zvono2Aktivno)) return;
+
+  // Dinamicke poruke za slavljenje i mrtvacko zvono prate stvarno stanje cekica.
+  uskladiAktivnostiPosebnihNacina();
+
+  if (pokusajPrikazatiInerciju()) return;
+  if (pokusajPrikazatiWiFiDijagnostiku()) return;
+  if (pokusajPrikazatiOtkucavanje()) return;
+  ocistiOtkucavanjeAkoJeZavrsilo();
+  if (pokusajPrikazatiHodSata()) return;
+  ocistiHodSataAkoJeZavrsio();
+  osvjeziTimeoutAktivnostiDrugogRetka();
+  prikaziAktivnostIliDatum();
 }
 
 static void set_activity_message(PGM_P message, unsigned long timeout_ms, bool is_error) {

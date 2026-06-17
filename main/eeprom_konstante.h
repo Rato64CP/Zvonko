@@ -108,13 +108,15 @@ struct PostavkeSpremnik {
   char zadaniGateway[16];
   char ntpServer[40];
   bool wifiOmogucen;
-  // Rezervirano mjesto starog serijskog prekidaca radi stabilnog EEPROM rasporeda.
-  bool rezerviranoSerijskaVeza;
+  // Stari rezervirani bajt RS485 prekidaca sada bira varijantu pogrebne skripte.
+  uint8_t vrstaPokojnickogZvona;
   bool imaKazaljke;
   uint16_t checksum;
 };
 
 constexpr uint16_t POSTAVKE_POTPIS = 0x5453;
+// Polarnost izlaznih releja D22-D29 cuva se kao zastavica u postojecoj
+// maski blagdanskih razdoblja, bez pomicanja EEPROM rasporeda.
 // Revizija 23 radi namjerni "cisti rez" korisnickih postavki toranjskog sata
 // kako novi firmware vise ne bi prihvacao starije EEPROM spremnike.
 constexpr uint8_t POSTAVKE_VERZIJA = 23;

@@ -16,7 +16,6 @@ namespace {
 
 constexpr unsigned long ODGODA_MISE_DO_SLIJEDECE_PROVJERE_MS = 1000UL;
 constexpr uint8_t NEDJELJA_U_TJEDNU = 0;
-constexpr uint8_t SEKUNDA_OKIDANJA_MISA = 25;
 constexpr uint8_t MUSKO_ZVONO = 1;
 constexpr uint16_t KLJUC_DATUMA_NEPOSTAVLJEN = 0xFFFFU;
 
@@ -184,10 +183,6 @@ static bool jeTerminMiseAktivan(const DateTime& sada,
                                 uint8_t satMise,
                                 uint8_t minutaMise,
                                 uint16_t minutePrijeMise) {
-  if (sada.second() != SEKUNDA_OKIDANJA_MISA) {
-    return false;
-  }
-
   const uint16_t terminMiseMinute =
       static_cast<uint16_t>(satMise) * 60U + static_cast<uint16_t>(minutaMise);
   const uint16_t trazenaMinutaUDanu =

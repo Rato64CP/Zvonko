@@ -30,12 +30,17 @@ Ova podmapa sadrzi glavni firmware projekta `ZVONKO v. 1.0` za `Arduino Mega 256
 - preko `ESP32` weba dopustene su sigurne skupine `Sustav`, `Stapici`, `BAT`, `Sunce` i `Blagdani`, dok `Mega` i dalje ostaje jedini autoritet za validaciju i spremanje
 - zasebni modul `main/mise_automatika.*` vodi redovite dnevne i nedjeljne mise te posebne blagdanske mise, odvojeno od `main/sunceva_automatika.*`
 - zasebni modul `main/pogrebne_skripte.*` vodi jednokratne sekvence `POKOJNIK` i `POKOJNICA` s `ESP32` dashboarda
-- `POKOJNIK` pokrece `MUSKO` zvono `2 minute`, ceka zavrsetak inercije pa zatim pokrece `MRTVACKO` `10 minuta`
-- `POKOJNICA` pokrece `ZENSKO` zvono `2 minute`, ceka zavrsetak inercije pa zatim pokrece `MRTVACKO` `10 minuta`
+- vrsta pokojnickog zvona bira se u `BAT` postavkama koje sprema `main/postavke.cpp`
+- vrsta `1` zadrzava dosadasnje sekvence: `POKOJNIK` koristi `MUSKO`, a `POKOJNICA` `ZENSKO` zvono `2 minute`, zatim `MRTVACKO` `10 minuta`
+- vrsta `2` koristi produljenu sekvencu: `POKOJNIK` pali oba zvona `2 minute`, a `POKOJNICA` `ZENSKO` zvono `2 minute`, zatim nakon inercije ide `MRTVACKO` `40 minuta`
 - `Blagdani` koriste unaprijed zadanu listu nepomicnih i pomicnih blagdana; web i serijski sloj uredjuju samo ukljucenje i vrijeme mise `HH:MM`, a toranjski sat zatim sam vodi nedjeljno zvonjenje oba zvona `2 h` i `1 h` prije mise, bez dodatnog `slavljenja`
 - `Redovite mise` nose dnevno i nedjeljno vrijeme mise `HH:MM`; dnevna misa koristi samo `MUSKO` zvono `30 min` prije mise, a nedjeljna misa nedjeljno zvonjenje oba zvona `2 h` i `1 h` prije mise
 - prazno vrijeme iz web sloja znaci da su odgovarajuca dnevna misa, nedjeljna misa ili blagdan iskljuceni, bez obzira na stanje kvacice
-- sva misna zvonjenja iz `main/mise_automatika.cpp` startaju u `25.` sekundi minute, sinkronizirano s citanjem cavala iz `main/okretna_ploca.cpp`
+- misna zvonjenja iz `main/mise_automatika.cpp` vezana su na ciljnu minutu i cekaju slobodnu mehaniku ako tada traje otkucavanje, zvono ili inercija
+- `main/okretna_ploca.cpp` cita cavle od `00.` sekunde minute koju pokazuje ploca; ako je tada aktivno otkucavanje, citanje ceka kraj otkucavanja
+- nakon povratka napajanja usred prozora zvonjenja cavli se smiju procitati dok jos nije isteklo zadano trajanje zvona, ali se poslije isteka tog prozora ne pokrece zakasnelo zvonjenje
+- raspored cavala je fiksan: radni dan/subota koriste cavle `1` i `2` za `ZVONO 1/2`, nedjelja cavle `3` i `4`, a cavao `5` sluzi za `SLAVLJENJE`
+- cavao `5` zakazuje slavljenje nakon zvona, inercije i odgode; vadjenje cavla otkazuje zakazano slavljenje ili zaustavlja samo slavljenje pokrenuto automatikom ploce
 - `BAT od/do` iz weba i lokalnog menija tumace se kao raspon u kojem je redovno otkucavanje dopusteno; izvan njega `Mega` blokira samo otkucavanje
 
 ## 🧩 Najvazniji moduli
@@ -94,8 +99,10 @@ Ova podmapa sadrzi glavni firmware projekta `ZVONKO v. 1.0` za `Arduino Mega 256
 
 - vanjska `24C32 EEPROM` ili `FM24W256 FRAM` memorija cuva postavke i kriticno radno stanje
 - iako je fizicki kapacitet veci, toranjski sat zadrzava postojeci kompatibilni raspored unutar prvih `4096 B`
-- `UnifiedMotionState` koristi `24` rotirajuca slota za kazaljke i okretnu plocu
+- `UnifiedMotionState` koristi `48` rotirajucih slotova za kazaljke i okretnu plocu
 - svaki zapis `UnifiedMotionState` nosi checksum kako bi se preskocio korumpirani slot nakon prekida napajanja usred upisa
+- start koraka kazaljki ili ploce ne pali relej dok `UnifiedMotionState` nije potvrden u vanjskom spremniku
+- ako se zavrsni zapis koraka ne potvrdi, `unified_motion_state.*` zadrzava privremeno sigurno radno stanje u RAM-u, ali ga ne proglasava trajnim EEPROM zapisom
 - zapis zadnje sinkronizacije vremena ima vlastiti checksum
 - `power_recovery.*` vraca kazaljke i plocu u dosljedno stanje nakon restarta
 - watchdog resetovi se pamte u zasebnom EEPROM bloku i tek ponovljeni watchdog resetovi bez power-loss oznake vode u `safe mode`

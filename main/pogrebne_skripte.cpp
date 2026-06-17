@@ -11,14 +11,19 @@
 #include "ups_nadzor.h"
 #include "zvonjenje.h"
 #include "otkucavanje.h"
+#include "otkucavanje_interno.h"
 #include "prekidac_tisine.h"
+#include "postavke.h"
 
 namespace {
 
 constexpr unsigned long TRAJANJE_POCETNOG_ZVONA_MS = 2UL * 60UL * 1000UL;
-constexpr uint8_t TRAJANJE_MRTVACKOG_MIN = 10U;
+constexpr uint8_t TRAJANJE_MRTVACKOG_KLASICNO_MIN = 10U;
+constexpr uint8_t TRAJANJE_MRTVACKOG_PRODULJENO_MIN = 40U;
 constexpr uint8_t MUSKO_ZVONO = 1;
 constexpr uint8_t ZENSKO_ZVONO = 2;
+constexpr uint8_t VRSTA_POKOJNICKOG_KLASICNA = 1;
+constexpr uint8_t VRSTA_POKOJNICKOG_PRODULJENA = 2;
 
 enum FazaPogrebneSkripte : uint8_t {
   POGREBNA_SKRIPTA_NEAKTIVNA = 0,
@@ -29,15 +34,23 @@ enum FazaPogrebneSkripte : uint8_t {
 
 struct StanjePogrebneSkripte {
   bool aktivna;
+  uint8_t tip;
   uint8_t zvono;
+  bool obaZvona;
+  uint8_t trajanjeMrtvackogMin;
   FazaPogrebneSkripte faza;
 };
 
 static StanjePogrebneSkripte stanje = {
-    false, MUSKO_ZVONO, POGREBNA_SKRIPTA_NEAKTIVNA};
+    false,
+    MUSKO_ZVONO,
+    MUSKO_ZVONO,
+    false,
+    TRAJANJE_MRTVACKOG_KLASICNO_MIN,
+    POGREBNA_SKRIPTA_NEAKTIVNA};
 
-static const __FlashStringHelper* nazivSkripte(uint8_t zvono) {
-  return (zvono == MUSKO_ZVONO) ? F("POKOJNIK") : F("POKOJNICA");
+static const __FlashStringHelper* nazivSkripte(uint8_t tip) {
+  return (tip == MUSKO_ZVONO) ? F("POKOJNIK") : F("POKOJNICA");
 }
 
 static bool jeSekvencaBlokirana() {
@@ -55,11 +68,22 @@ static bool jeToranjZauzetZaPogrebnuSekvencu() {
          jeMrtvackoUTijeku();
 }
 
+static void prekiniOtkucavanjeAkoSamoOnoBlokiraPogrebnuSekvencu() {
+  if (jeOtkucavanjeUTijeku() &&
+      !jeZvonoUTijeku() &&
+      !jeLiInerciaAktivna() &&
+      !jeSlavljenjeUTijeku() &&
+      !jeMrtvackoUTijeku()) {
+    prekiniAktivnoOtkucavanjeZbogPosebnogNacina(
+        F("pogrebna skripta preuzima prioritet nad otkucavanjem"));
+  }
+}
+
 static void logirajStanjeSkripte(const __FlashStringHelper* poruka) {
   char log[128];
   char naziv[16];
   char tekstPoruke[72];
-  strncpy_P(naziv, reinterpret_cast<PGM_P>(nazivSkripte(stanje.zvono)), sizeof(naziv) - 1);
+  strncpy_P(naziv, reinterpret_cast<PGM_P>(nazivSkripte(stanje.tip)), sizeof(naziv) - 1);
   naziv[sizeof(naziv) - 1] = '\0';
   strncpy_P(tekstPoruke, reinterpret_cast<PGM_P>(poruka), sizeof(tekstPoruke) - 1);
   tekstPoruke[sizeof(tekstPoruke) - 1] = '\0';
@@ -72,47 +96,101 @@ static void logirajStanjeSkripte(const __FlashStringHelper* poruka) {
 }
 
 static void zaustaviAktivnuSekvencuBezLoga() {
-  if (jeZvonoAktivno(stanje.zvono)) {
-    iskljuciZvono(stanje.zvono);
-  }
-  if (jeMrtvackoUTijeku()) {
-    zaustaviMrtvacko();
+  if (stanje.aktivna) {
+    if (stanje.obaZvona) {
+      if (jeZvonoAktivno(MUSKO_ZVONO)) {
+        iskljuciZvono(MUSKO_ZVONO);
+      }
+      if (jeZvonoAktivno(ZENSKO_ZVONO)) {
+        iskljuciZvono(ZENSKO_ZVONO);
+      }
+    } else if (jeZvonoAktivno(stanje.zvono)) {
+      iskljuciZvono(stanje.zvono);
+    }
+    if (jeMrtvackoUTijeku()) {
+      zaustaviMrtvacko();
+    }
   }
   stanje.aktivna = false;
   stanje.faza = POGREBNA_SKRIPTA_NEAKTIVNA;
+  stanje.obaZvona = false;
+  stanje.trajanjeMrtvackogMin = TRAJANJE_MRTVACKOG_KLASICNO_MIN;
 }
 
-static bool pokreniPogrebnuSekvencu(uint8_t zvono) {
-  if (stanje.aktivna || (zvono != MUSKO_ZVONO && zvono != ZENSKO_ZVONO)) {
-    return false;
+static bool jePocetnoZvonoZavrsilo() {
+  if (stanje.obaZvona) {
+    return !jeZvonoAktivno(MUSKO_ZVONO) && !jeZvonoAktivno(ZENSKO_ZVONO);
   }
+  return !jeZvonoAktivno(stanje.zvono);
+}
 
-  if (jeSekvencaBlokirana() || jeToranjZauzetZaPogrebnuSekvencu()) {
+static bool pokreniPocetnoZvono(uint8_t zvono, bool obaZvona) {
+  if (obaZvona) {
+    aktivirajZvonjenjeNaTrajanje(MUSKO_ZVONO, TRAJANJE_POCETNOG_ZVONA_MS);
+    aktivirajZvonjenjeNaTrajanje(ZENSKO_ZVONO, TRAJANJE_POCETNOG_ZVONA_MS);
+    if (jeZvonoAktivno(MUSKO_ZVONO) && jeZvonoAktivno(ZENSKO_ZVONO)) {
+      return true;
+    }
+    if (jeZvonoAktivno(MUSKO_ZVONO)) {
+      iskljuciZvono(MUSKO_ZVONO);
+    }
+    if (jeZvonoAktivno(ZENSKO_ZVONO)) {
+      iskljuciZvono(ZENSKO_ZVONO);
+    }
     return false;
   }
 
   aktivirajZvonjenjeNaTrajanje(zvono, TRAJANJE_POCETNOG_ZVONA_MS);
-  if (!jeZvonoAktivno(zvono)) {
+  return jeZvonoAktivno(zvono);
+}
+
+static bool pokreniPogrebnuSekvencu(uint8_t tip) {
+  if (stanje.aktivna || (tip != MUSKO_ZVONO && tip != ZENSKO_ZVONO)) {
+    return false;
+  }
+
+  prekiniOtkucavanjeAkoSamoOnoBlokiraPogrebnuSekvencu();
+  if (jeSekvencaBlokirana() || jeToranjZauzetZaPogrebnuSekvencu()) {
+    return false;
+  }
+
+  const uint8_t vrstaPokojnickogZvona = dohvatiVrstuPokojnickogZvona();
+  const bool produljenaVarijanta = vrstaPokojnickogZvona == VRSTA_POKOJNICKOG_PRODULJENA;
+  const bool obaZvona = produljenaVarijanta && tip == MUSKO_ZVONO;
+  const uint8_t pocetnoZvono = (tip == MUSKO_ZVONO) ? MUSKO_ZVONO : ZENSKO_ZVONO;
+  const uint8_t trajanjeMrtvackog =
+      produljenaVarijanta ? TRAJANJE_MRTVACKOG_PRODULJENO_MIN : TRAJANJE_MRTVACKOG_KLASICNO_MIN;
+
+  if (!pokreniPocetnoZvono(pocetnoZvono, obaZvona)) {
     return false;
   }
 
   stanje.aktivna = true;
-  stanje.zvono = zvono;
+  stanje.tip = tip;
+  stanje.zvono = pocetnoZvono;
+  stanje.obaZvona = obaZvona;
+  stanje.trajanjeMrtvackogMin = trajanjeMrtvackog;
   stanje.faza = POGREBNA_SKRIPTA_ZVONO;
-  logirajStanjeSkripte(F("pokrecem zvono 2 minute, zatim cekam inerciju i mrtvacko 10 minuta"));
+  if (produljenaVarijanta && obaZvona) {
+    logirajStanjeSkripte(F("pokrecem oba zvona 2 minute, zatim cekam inerciju i mrtvacko 40 minuta"));
+  } else if (produljenaVarijanta) {
+    logirajStanjeSkripte(F("pokrecem zensko zvono 2 minute, zatim cekam inerciju i mrtvacko 40 minuta"));
+  } else {
+    logirajStanjeSkripte(F("pokrecem zvono 2 minute, zatim cekam inerciju i mrtvacko 10 minuta"));
+  }
   return true;
 }
 
-static bool prebaciPogrebnuSekvencu(uint8_t zvono) {
-  if (zvono != MUSKO_ZVONO && zvono != ZENSKO_ZVONO) {
+static bool prebaciPogrebnuSekvencu(uint8_t tip) {
+  if (tip != MUSKO_ZVONO && tip != ZENSKO_ZVONO) {
     return false;
   }
 
   if (!stanje.aktivna) {
-    return pokreniPogrebnuSekvencu(zvono);
+    return pokreniPogrebnuSekvencu(tip);
   }
 
-  if (stanje.zvono != zvono) {
+  if (stanje.tip != tip) {
     logirajStanjeSkripte(F("odbijeno jer je druga pogrebna sekvenca vec aktivna"));
     return false;
   }
@@ -126,7 +204,10 @@ static bool prebaciPogrebnuSekvencu(uint8_t zvono) {
 
 void inicijalizirajPogrebneSkripte() {
   stanje.aktivna = false;
+  stanje.tip = MUSKO_ZVONO;
   stanje.zvono = MUSKO_ZVONO;
+  stanje.obaZvona = false;
+  stanje.trajanjeMrtvackogMin = TRAJANJE_MRTVACKOG_KLASICNO_MIN;
   stanje.faza = POGREBNA_SKRIPTA_NEAKTIVNA;
 }
 
@@ -138,21 +219,14 @@ void upravljajPogrebnimSkriptama(unsigned long sadaMs) {
   }
 
   if (jeSekvencaBlokirana()) {
-    if (jeZvonoAktivno(stanje.zvono)) {
-      iskljuciZvono(stanje.zvono);
-    }
-    if (jeMrtvackoUTijeku()) {
-      zaustaviMrtvacko();
-    }
     logirajStanjeSkripte(F("prekinuto zbog tihog rezima, gubitka vremena, RTC fail-safea ili UPS moda"));
-    stanje.aktivna = false;
-    stanje.faza = POGREBNA_SKRIPTA_NEAKTIVNA;
+    zaustaviAktivnuSekvencuBezLoga();
     return;
   }
 
   switch (stanje.faza) {
     case POGREBNA_SKRIPTA_ZVONO:
-      if (!jeZvonoAktivno(stanje.zvono)) {
+      if (jePocetnoZvonoZavrsilo()) {
         stanje.faza = POGREBNA_SKRIPTA_CEKA_ZAVRSETAK;
         logirajStanjeSkripte(F("zvono je zavrsilo, cekam da se smiri inercija"));
       }
@@ -167,9 +241,13 @@ void upravljajPogrebnimSkriptama(unsigned long sadaMs) {
         return;
       }
 
-      if (pokusajZapocetiMrtvackoSaFiksnimTrajanjemBezCekanja(TRAJANJE_MRTVACKOG_MIN)) {
+      if (pokusajZapocetiMrtvackoSaFiksnimTrajanjemBezCekanja(stanje.trajanjeMrtvackogMin)) {
         stanje.faza = POGREBNA_SKRIPTA_MRTVACKO;
-        logirajStanjeSkripte(F("pokrecem mrtvacko 10 minuta"));
+        if (stanje.trajanjeMrtvackogMin == TRAJANJE_MRTVACKOG_PRODULJENO_MIN) {
+          logirajStanjeSkripte(F("pokrecem mrtvacko 40 minuta"));
+        } else {
+          logirajStanjeSkripte(F("pokrecem mrtvacko 10 minuta"));
+        }
       }
       break;
 
@@ -178,12 +256,16 @@ void upravljajPogrebnimSkriptama(unsigned long sadaMs) {
         logirajStanjeSkripte(F("sekvenca zavrsena"));
         stanje.aktivna = false;
         stanje.faza = POGREBNA_SKRIPTA_NEAKTIVNA;
+        stanje.obaZvona = false;
+        stanje.trajanjeMrtvackogMin = TRAJANJE_MRTVACKOG_KLASICNO_MIN;
       }
       break;
 
     default:
       stanje.aktivna = false;
       stanje.faza = POGREBNA_SKRIPTA_NEAKTIVNA;
+      stanje.obaZvona = false;
+      stanje.trajanjeMrtvackogMin = TRAJANJE_MRTVACKOG_KLASICNO_MIN;
       break;
   }
 }
@@ -196,7 +278,7 @@ uint8_t dohvatiTipAktivnePogrebneSkripte() {
   if (!stanje.aktivna) {
     return 0;
   }
-  return stanje.zvono;
+  return stanje.tip;
 }
 
 bool prebaciPokojnika() {

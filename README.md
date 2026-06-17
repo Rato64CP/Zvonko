@@ -8,6 +8,7 @@
 - upravlja kazaljkama sata uz korekciju i sinkronizaciju
 - upravlja okretnom plocom kroz dvofazne korake i citanje cavala
 - vodi zvona, cekice, slavljenje i mrtvacko
+- cita cavle okretne ploce od `00.` sekunde ciljane minute, nakon otkucavanja ako ono tada traje
 - podrzava odvojenu inerciju `INR1` i `INR2` za dva razlicita zvona
 - podrzava opciju `K:0/1` za rad s kocnicom zvona ili bez nje
 - kod `K=0` sinkronizira zavrsetak dvaju zvona prema stvarnoj razlici inercija, uz zastitni prag rada od `20 s` i operator-prozor do `2 s` izmedu dva `OFF`
@@ -77,8 +78,9 @@
 - setup stranica je dostupna na `http://192.168.4.1/` i `http://192.168.4.1/setup`
 - nakon spremanja nove mreze `ESP32` prosljeduje WiFi podatke i Megi kako bi cijeli toranjski sat ostao uskladen
 - servisni dashboard na `ESP` sada koristi glavne tipke `MUSKO`, `ZENSKO`, `SLAVI`, `BRECA`, jednokratne pogrebne tipke `POKOJNIK` i `POKOJNICA`, sunceve tipke `JUTRO`, `PODNE`, `VECER` i crveni toggle `TIHI MOD`
-- `POKOJNIK` pokrece `MUSKO` zvono `2 minute`, ceka zavrsetak inercije pa zatim pokrece `MRTVACKO` `10 minuta`
-- `POKOJNICA` pokrece `ZENSKO` zvono `2 minute`, ceka zavrsetak inercije pa zatim pokrece `MRTVACKO` `10 minuta`
+- vrsta pokojnickog zvona bira se u `BAT` postavkama koje vodi `main/postavke.cpp`
+- vrsta `1` zadrzava dosadasnje sekvence: `POKOJNIK` koristi `MUSKO`, a `POKOJNICA` `ZENSKO` zvono `2 minute`, zatim `MRTVACKO` `10 minuta`
+- vrsta `2` koristi produljenu sekvencu: `POKOJNIK` pali oba zvona `2 minute`, a `POKOJNICA` `ZENSKO` zvono `2 minute`, zatim nakon inercije ide `MRTVACKO` `40 minuta`
 - lokalni ulazi `JUTRO`, `PODNE` i `VECER` na `Megi` rade kao trenutne servisne tipke
   - svaki pritisak prebaci stanje odgovarajuceg suncevog dogadaja
   - pripadna LED lampica stalno svijetli dok je dogadaj omogucen
@@ -87,7 +89,11 @@
 - dnevna misa pokrece samo `MUSKO` zvono `30 min` prije upisanog vremena mise `HH:MM`
 - nedjeljna i blagdanska misa pokrecu nedjeljno zvonjenje oba zvona `2 h` i `1 h` prije upisanog vremena mise `HH:MM`, bez dodatnog `slavljenja`
 - prazno polje vremena na webu znaci da su odgovarajuca redovita misa ili blagdan iskljuceni, bez obzira na stanje kvacice
-- sva misna zvonjenja startaju u `25.` sekundi minute, sinkronizirano s citanjem cavala u [main/okretna_ploca.cpp](main/okretna_ploca.cpp)
+- sva misna zvonjenja vezana su na ciljnu minutu i cekaju slobodnu mehaniku ako tada traje otkucavanje, zvono ili inercija
+- okretna ploca cita cavle na pocetku minute koju pokazuje; ako tada traje satno otkucavanje, citanje ceka kraj otkucavanja
+- ako se toranjski sat nakon nestanka napajanja vrati usred prozora zvonjenja, cavli se jos smiju procitati; nakon isteka zadanog trajanja zvona vise ne pokrecu zakasnelo zvonjenje
+- raspored cavala je fiksan: radni dan/subota koriste cavle `1` i `2` za `ZVONO 1/2`, nedjelja koristi cavle `3` i `4`, a cavao `5` pokrece `SLAVLJENJE`
+- cavao `5` za slavljenje ceka kraj zvona i inercije, a vadjenje cavla zaustavlja samo slavljenje koje je pokrenula automatika ploce
 
 ## 💾 EEPROM I Recovery
 
@@ -96,6 +102,7 @@
 - aktualna revizija firmwarea namjerno ne cita starije `UnifiedMotionState`, stare periodicke recovery backup zapise ni starije verzije korisnickih EEPROM spremnika, pa nakon nadogradnje treba ponovno postaviti toranjski sat ako je ranije radio na starijem rasporedu
 - `UnifiedMotionState` koristi `48` rotirajucih slotova za kazaljke i okretnu plocu
 - svaki `UnifiedMotionState` slot ima checksum i nevaljan ili polovicno upisan zapis se preskace
+- relej kazaljki ili ploce pali se tek nakon potvrdenog zapisa starta koraka; ako zavrsni zapis ne prodje, runtime zadrzava sigurno mirno stanje i ne tretira ga kao trajni EEPROM zapis
 - zapis zadnje sinkronizacije vremena sada ima vlastiti checksum uz kompatibilno citanje starog formata
 - `power_recovery.*` vraca kazaljke i plocu u dosljedno stanje nakon restarta
 - watchdog resetovi se prate kroz perzistentni brojac i nakon vise uzastopnih watchdog resetova aktivira se `safe mode`
@@ -119,6 +126,7 @@
 - `BAT od/do` oznacava raspon u kojem je redovno otkucavanje dopusteno
 - izvan `BAT od/do` raspona redovno otkucavanje je blokirano, ali zvona, sunceva automatika i okretna ploca nastavljaju raditi
 - primjer: `BAT od 6` i `BAT do 22` znaci da otkucavanje radi od `06:00` do `22:00`, a izvan toga ne radi
+- `POK` u `BAT` postavkama bira vrstu pokojnickog zvona: `1` je dosadasnja sekvenca, `2` je produljena sekvenca s mrtvackim `40 minuta`
 - za nocni raspon tipa `22-6` `22:00` jos smije otkucati, a nakon toga krece tisi dio noci
 - sunceva automatika i cavli ploce rade i tijekom BAT raspona
 - jutarnje suncevo zvono moze ranije otvoriti otkucavanje prije kraja BAT raspona

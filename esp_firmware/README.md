@@ -42,8 +42,9 @@ Ova podmapa sadrzi firmware za vanjski `ESP32` modul koji radi kao mrezni sloj t
 
 - gornji 2x2 blok koristi tipke `MUSKO`, `ZENSKO`, `SLAVI`, `BRECA`
 - ispod gornjeg bloka postoje dvije jednokratne tipke `POKOJNIK` i `POKOJNICA`
-- `POKOJNIK` salje sekvencu `MUSKO` zvono `2 minute` -> cekanje inercije -> `MRTVACKO` `10 minuta`
-- `POKOJNICA` salje sekvencu `ZENSKO` zvono `2 minute` -> cekanje inercije -> `MRTVACKO` `10 minuta`
+- vrsta pokojnickog zvona bira se u `BAT` postavkama, a izvrsava je `main/pogrebne_skripte.cpp` na `Megi`
+- vrsta `1` zadrzava dosadasnje sekvence: `POKOJNIK` koristi `MUSKO`, a `POKOJNICA` `ZENSKO` zvono `2 minute`, zatim `MRTVACKO` `10 minuta`
+- vrsta `2` koristi produljenu sekvencu: `POKOJNIK` pali oba zvona `2 minute`, a `POKOJNICA` `ZENSKO` zvono `2 minute`, zatim nakon inercije ide `MRTVACKO` `40 minuta`
 - donji blok koristi tipke `JUTRO`, `PODNE`, `VECER`
 - ispod suncevih tipki postoji crveni toggle `TIHI MOD`
 - pri dnu dashboarda postoji servisni link `POSTAVKE`
@@ -62,14 +63,16 @@ Ova podmapa sadrzi firmware za vanjski `ESP32` modul koji radi kao mrezni sloj t
   - `Blagdani`
 - `Sustav` ukljucuje `LCD svjetlo`, `Logiranje`, `UPS mod`, `Kocnicu zvona`, `INR1`, `INR2` i `Impuls cekica`
 - `Stapici` ukljucuju trajanja `TR`, `TN`, `TS` i odgodu slavljenja `S`
-- `BAT` ukljucuje sate `od/do` i modove `OTK`, `S` i `M`
+- `BAT` ukljucuje sate `od/do`, modove `OTK`, `S`, `M` i vrstu pokojnickog zvona `POK`
 - `BAT od/do` na webu znaci raspon u kojem je redovno otkucavanje dopusteno; izvan tog raspona `Mega` blokira samo otkucavanje kroz `main/postavke.cpp` i `main/otkucavanje.cpp`
 - `Sunce` ukljucuje `Jutro`, `Podne`, `Vecer`, odabir zvona, jutarnje/vecernje odgode i `Nocnu rasvjetu`
 - `Blagdani` ukljucuju dnevnu i nedjeljnu misu te unaprijed zadanu listu `15` nepomicnih i `7` pomicnih blagdana; za svaki blagdan uredjuje se samo ukljucenje i vrijeme mise `HH:MM`
 - dnevna misa pokrece samo `MUSKO` zvono `30 min` prije upisanog vremena mise `HH:MM`, uz radno trajanje zvonjenja iz `main/postavke.cpp`
 - nedjeljna i blagdanska misa pokrecu nedjeljno zvonjenje oba zvona `2 h` i `1 h` prije upisanog vremena mise `HH:MM`, bez dodatnog `slavljenja`
 - prazno polje vremena na `/blagdani` znaci da su odgovarajuca redovita misa ili blagdan iskljuceni, bez obzira na stanje kvacice
-- sva misna zvonjenja startaju u `25.` sekundi minute, sinkronizirano s citanjem cavala iz `main/okretna_ploca.cpp`
+- sva misna zvonjenja vezana su na ciljnu minutu toranjskog sata i cekaju slobodnu mehaniku ako tada traje otkucavanje, zvono ili inercija
+- cavli okretne ploce nisu web-postavka: `Mega` ih vodi fiksno kao radni `1/2`, nedjelja `3/4` i slavljenje `5`
+- zvonjenje preko cavala cita se od `00.` sekunde ciljane minute, ali ceka kraj otkucavanja ako ono tada traje
 - `Mega` ostaje jedini autoritet za validaciju i spremanje kroz `main/postavke.cpp`
 - `ESP32` samo prikazuje formu, salje cijeli paket i nakon potvrde ponovno cita stvarno stanje s `Mege`
 

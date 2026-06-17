@@ -235,10 +235,11 @@ static void ucitajPostavkePloceZaUredjivanje() {
 
 static int tihiSatOd = 22;
 static int tihiSatDo = 6;
-static uint8_t faza_tihih_sati = 0; // 0 = OD, 1 = DO, 2 = OTK, 3 = SL, 4 = MRT
+static uint8_t faza_tihih_sati = 0; // 0 = OD, 1 = DO, 2 = OTK, 3 = SL, 4 = MRT, 5 = POK
 static uint8_t modOtkucavanjaUredjivanje = 2;
 static uint8_t modSlavljenjaUredjivanje = 1;
 static uint8_t modMrtvackogUredjivanje = 1;
+static uint8_t vrstaPokojnickogUredjivanje = 1;
 
 static int trajanjeZvonaRdMin = 2;
 static int trajanjeZvonaNedMin = 3;
@@ -488,6 +489,7 @@ static void ucitajTihiPeriodZaUredjivanje() {
   modOtkucavanjaUredjivanje = dohvatiModOtkucavanja();
   modSlavljenjaUredjivanje = dohvatiModSlavljenja();
   modMrtvackogUredjivanje = dohvatiModMrtvackog();
+  vrstaPokojnickogUredjivanje = dohvatiVrstuPokojnickogZvona();
   faza_tihih_sati = 0;
 }
 
@@ -604,7 +606,8 @@ static void potvrdiSpremanjeTihihSati() {
       tihiSatOd,
       modOtkucavanjaUredjivanje,
       modSlavljenjaUredjivanje,
-      modMrtvackogUredjivanje);
+      modMrtvackogUredjivanje,
+      vrstaPokojnickogUredjivanje);
   faza_tihih_sati = 0;
   vratiNaGlavniMeniNaStavku(INDEX_POSTAVKE_TIHI_SATI);
   posaljiPCLog(F("Kompaktne postavke otkucavanja spremljene"));
@@ -830,10 +833,11 @@ static void prikaziPodesavanjeTihihSati() {
   snprintf_P(redak1, sizeof(redak1), PSTR("BAT %02d:00-%02d:00"), tihiSatOd, tihiSatDo);
   snprintf_P(redak2,
              sizeof(redak2),
-             PSTR("OTK:%u S:%u M:%u"),
+             PSTR("O:%u S:%u M:%u P:%u"),
              static_cast<unsigned>(modOtkucavanjaUredjivanje),
              static_cast<unsigned>(modSlavljenjaUredjivanje),
-             static_cast<unsigned>(modMrtvackogUredjivanje));
+             static_cast<unsigned>(modMrtvackogUredjivanje),
+             static_cast<unsigned>(vrstaPokojnickogUredjivanje));
   prikaziPoruku(redak1, redak2);
 
   lcd.cursor();
@@ -846,13 +850,16 @@ static void prikaziPodesavanjeTihihSati() {
       lcd.setCursor(10, 0);
       break;
     case 2:
-      lcd.setCursor(4, 1);
+      lcd.setCursor(2, 1);
       break;
     case 3:
-      lcd.setCursor(8, 1);
+      lcd.setCursor(6, 1);
+      break;
+    case 4:
+      lcd.setCursor(10, 1);
       break;
     default:
-      lcd.setCursor(12, 1);
+      lcd.setCursor(14, 1);
       break;
   }
 }
@@ -1388,8 +1395,10 @@ static void obradiKlucTihiSati(KeyEvent event) {
         modOtkucavanjaUredjivanje = (modOtkucavanjaUredjivanje + 1) % 3;
       } else if (faza_tihih_sati == 3) {
         modSlavljenjaUredjivanje = (modSlavljenjaUredjivanje >= 2) ? 1 : 2;
-      } else {
+      } else if (faza_tihih_sati == 4) {
         modMrtvackogUredjivanje = (modMrtvackogUredjivanje >= 2) ? 1 : 2;
+      } else {
+        vrstaPokojnickogUredjivanje = (vrstaPokojnickogUredjivanje >= 2) ? 1 : 2;
       }
       break;
     case KEY_DOWN:
@@ -1401,15 +1410,17 @@ static void obradiKlucTihiSati(KeyEvent event) {
         modOtkucavanjaUredjivanje = (modOtkucavanjaUredjivanje + 2) % 3;
       } else if (faza_tihih_sati == 3) {
         modSlavljenjaUredjivanje = (modSlavljenjaUredjivanje <= 1) ? 2 : 1;
-      } else {
+      } else if (faza_tihih_sati == 4) {
         modMrtvackogUredjivanje = (modMrtvackogUredjivanje <= 1) ? 2 : 1;
+      } else {
+        vrstaPokojnickogUredjivanje = (vrstaPokojnickogUredjivanje <= 1) ? 2 : 1;
       }
       break;
     case KEY_LEFT:
-      faza_tihih_sati = (faza_tihih_sati - 1 + 5) % 5;
+      faza_tihih_sati = (faza_tihih_sati - 1 + 6) % 6;
       break;
     case KEY_RIGHT:
-      faza_tihih_sati = (faza_tihih_sati + 1) % 5;
+      faza_tihih_sati = (faza_tihih_sati + 1) % 6;
       break;
     case KEY_SELECT:
       potvrdiSpremanjeTihihSati();

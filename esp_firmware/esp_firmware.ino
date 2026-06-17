@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <Update.h>
+#include <esp_system.h>
 using ToranjWebServer = WebServer;
 #else
 #error "Ovaj firmware podrzava samo ESP32."
@@ -59,23 +60,45 @@ static const uint32_t NTP_REFERENTNI_MAX_UNIX = 4102444799UL;
 static const unsigned long WIFI_WATCHDOG_NTP_ZASTOJ_MS = 7200000UL;
 static const size_t SERIJSKI_BUFFER_MAX = 1280;
 static const size_t SERIJSKI_BUDZET_BAJTOVA_PO_POZIVU = 192;
-static const size_t WEB_LOZINKA_MAX = 33;
+static const size_t WEB_PIN_DULJINA = 4;
+static const size_t WEB_PIN_MAX = WEB_PIN_DULJINA + 1;
 static const size_t ESP_EEPROM_VELICINA = 512;
-static const uint16_t WEB_AUTH_POTPIS = 0x5741;
+static const uint16_t WEB_AUTH_POTPIS = 0x5750;
 static const int ESP_EEPROM_ADRESA_WEB = 0;
 static const unsigned long CMD_CEKANJE_NA_MEGU_MS = 1500UL;
 static const unsigned long WEB_AUTH_NEUSPJEH_ODGODA_MS = 750UL;
+static const uint8_t WEB_AUTH_MAX_PROMASAJA_PO_IP = 5;
+static const uint8_t WEB_AUTH_IP_SLOTOVA = 4;
+static const uint8_t WEB_AUTH_SESIJA_SLOTOVA = 4;
+static const unsigned long WEB_AUTH_SESIJA_TIMEOUT_MS = 4UL * 60UL * 60UL * 1000UL;
 
 WiFiUDP ntpUDP;
 
 ToranjWebServer webPosluzitelj(80);
 
-char webLozinka[WEB_LOZINKA_MAX] = "cista2906";
+char webPin[WEB_PIN_MAX] = "2906";
 
 struct WebAuthConfig {
   uint16_t potpis;
-  char lozinka[WEB_LOZINKA_MAX];
+  char pin[WEB_PIN_MAX];
 };
+
+struct WebAuthIpStanje {
+  IPAddress adresa;
+  uint8_t promasaji;
+  bool blokiran;
+  bool zauzet;
+};
+
+struct WebAuthSesija {
+  IPAddress adresa;
+  uint32_t token;
+  unsigned long zadnjaAktivnostMs;
+  bool aktivna;
+};
+
+WebAuthIpStanje webAuthIpStanja[WEB_AUTH_IP_SLOTOVA] = {};
+WebAuthSesija webAuthSesije[WEB_AUTH_SESIJA_SLOTOVA] = {};
 
 enum CmdOdgovorMegai {
   CMD_ODGOVOR_CEKA = 0,
@@ -120,6 +143,7 @@ struct MegaBATPostavke {
   uint8_t modOtkucavanja;
   uint8_t modSlavljenja;
   uint8_t modMrtvackog;
+  uint8_t vrstaPokojnickogZvona;
   unsigned long serijskiBroj;
 };
 
@@ -245,6 +269,7 @@ MegaBATPostavke megaBATPostavke = {
   0U,
   0U,
   0U,
+  0U,
   0UL
 };
 MegaSuncevePostavke megaSuncevePostavke = {
@@ -351,6 +376,7 @@ PostavkeOdgovorMegai posaljiBATPostavkeMegai(unsigned int satOd,
                                              unsigned int modOtkucavanja,
                                              unsigned int modSlavljenja,
                                              unsigned int modMrtvackog,
+                                             unsigned int vrstaPokojnickogZvona,
                                              unsigned long timeoutMs);
 PostavkeOdgovorMegai posaljiSuncevePostavkeMegai(bool jutroOmoguceno,
                                                  unsigned int jutroZvono,

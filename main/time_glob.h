@@ -2,12 +2,6 @@
 
 #include <RTClib.h>
 
-enum RezultatProvjereSinkronizacije {
-  SINKRONIZACIJA_ODBIJENA = 0,
-  SINKRONIZACIJA_CEKA_DODATNU_POTVRDU = 1,
-  SINKRONIZACIJA_PRIHVACENA = 2
-};
-
 void inicijalizirajRTC();
 
 DateTime dohvatiTrenutnoVrijeme();

@@ -86,6 +86,24 @@ bool jePotpisaniDecimalniBrojString(const String& vrijednost) {
   return jeDecimalniBrojString(vrijednost);
 }
 
+bool jeUIntURasponu(unsigned int vrijednost, unsigned int najmanje, unsigned int najvise) {
+  return vrijednost >= najmanje && vrijednost <= najvise;
+}
+
+bool jeIntURasponu(int vrijednost, int najmanje, int najvise) {
+  return vrijednost >= najmanje && vrijednost <= najvise;
+}
+
+bool jeSatIMinutaValjano(unsigned int sat, unsigned int minuta) {
+  return sat <= 23U && minuta <= 59U;
+}
+
+bool jeOmogucenSatIMinutaValjano(unsigned int omogucen,
+                                 unsigned int sat,
+                                 unsigned int minuta) {
+  return omogucen <= 1U && jeSatIMinutaValjano(sat, minuta);
+}
+
 bool posaljiSetupWiFiMegai(const String &ssid, const String &lozinka, String &odgovor, unsigned long timeoutMs) {
   odgovorSetupWiFiPrimljen = false;
   setupWiFiNeuspjeh = false;
@@ -309,6 +327,10 @@ bool obradiSustavskePostavkeMegai(char* payload) {
       !procitajUIntPolje(payload, "imp=", &impulsCekicaMs)) {
     return false;
   }
+  if (!jeUIntURasponu(inercijaZvona1Sekunde, 0U, 255U) ||
+      !jeUIntURasponu(inercijaZvona2Sekunde, 0U, 255U)) {
+    return false;
+  }
 
   megaSustavskePostavke.poznate = true;
   megaSustavskePostavke.lcdPozadinskoOsvjetljenje = lcdPozadinskoOsvjetljenje;
@@ -336,6 +358,12 @@ bool obradiPostavkeStapicaMegai(char* payload) {
       !procitajUIntPolje(payload, "odg=", &odgodaSlavljenjaSekunde)) {
     return false;
   }
+  if (!jeUIntURasponu(trajanjeRadniMin, 0U, 255U) ||
+      !jeUIntURasponu(trajanjeNedjeljaMin, 0U, 255U) ||
+      !jeUIntURasponu(trajanjeSlavljenjaMin, 0U, 255U) ||
+      !jeUIntURasponu(odgodaSlavljenjaSekunde, 0U, 255U)) {
+    return false;
+  }
 
   megaPostavkeStapica.poznate = true;
   megaPostavkeStapica.trajanjeRadniMin = static_cast<uint8_t>(trajanjeRadniMin);
@@ -353,12 +381,28 @@ bool obradiBATPostavkeMegai(char* payload) {
   unsigned int modOtkucavanja = 0;
   unsigned int modSlavljenja = 0;
   unsigned int modMrtvackog = 0;
+  unsigned int vrstaPokojnickogZvona = 1;
 
   if (!procitajUIntPolje(payload, "od=", &satOd) ||
       !procitajUIntPolje(payload, "do=", &satDo) ||
       !procitajUIntPolje(payload, "otk=", &modOtkucavanja) ||
       !procitajUIntPolje(payload, "sl=", &modSlavljenja) ||
       !procitajUIntPolje(payload, "mr=", &modMrtvackog)) {
+    return false;
+  }
+  if (!jeUIntURasponu(satOd, 0U, 23U) ||
+      !jeUIntURasponu(satDo, 0U, 23U) ||
+      !jeUIntURasponu(modOtkucavanja, 0U, 2U) ||
+      !jeUIntURasponu(modSlavljenja, 1U, 2U) ||
+      !jeUIntURasponu(modMrtvackog, 1U, 2U)) {
+    return false;
+  }
+
+  if (pronadiVrijednostPolja(payload, "pok=") != nullptr &&
+      !procitajUIntPolje(payload, "pok=", &vrstaPokojnickogZvona)) {
+    return false;
+  }
+  if (!jeUIntURasponu(vrstaPokojnickogZvona, 1U, 2U)) {
     return false;
   }
 
@@ -368,6 +412,7 @@ bool obradiBATPostavkeMegai(char* payload) {
   megaBATPostavke.modOtkucavanja = static_cast<uint8_t>(modOtkucavanja);
   megaBATPostavke.modSlavljenja = static_cast<uint8_t>(modSlavljenja);
   megaBATPostavke.modMrtvackog = static_cast<uint8_t>(modMrtvackog);
+  megaBATPostavke.vrstaPokojnickogZvona = static_cast<uint8_t>(vrstaPokojnickogZvona);
   ++megaBATPostavke.serijskiBroj;
   return true;
 }
@@ -392,6 +437,13 @@ bool obradiSuncevePostavkeMegai(char* payload) {
       !procitajUIntPolje(payload, "vb=", &vecerZvono) ||
       !procitajIntPolje(payload, "vo=", &vecerOdgodaMin) ||
       !procitajBoolPolje(payload, "nr=", &nocnaRasvjeta)) {
+    return false;
+  }
+  if (!jeUIntURasponu(jutroZvono, 0U, 2U) ||
+      !jeUIntURasponu(podneZvono, 0U, 2U) ||
+      !jeUIntURasponu(vecerZvono, 0U, 2U) ||
+      !jeIntURasponu(jutroOdgodaMin, -128, 127) ||
+      !jeIntURasponu(vecerOdgodaMin, -128, 127)) {
     return false;
   }
 
@@ -444,6 +496,9 @@ bool obradiMisePostavkeMegai(char* payload) {
     unsigned int sat = 0;
     unsigned int minuta = 0;
     if (sscanf(vrijednost, "%u,%u,%u", &omogucena, &sat, &minuta) != 3) {
+      return false;
+    }
+    if (!jeOmogucenSatIMinutaValjano(omogucena, sat, minuta)) {
       return false;
     }
 
@@ -510,16 +565,18 @@ bool obradiNepomicneBlagdaneMegai(char* payload) {
     if (krajIndeksa == nullptr || *krajIndeksa != '\0') {
       return false;
     }
-
-    const uint8_t indeks = static_cast<uint8_t>(indeksBroj);
-    if (indeks >= BROJ_NEPOMICNIH_BLAGDANA) {
+    if (indeksBroj >= BROJ_NEPOMICNIH_BLAGDANA) {
       return false;
     }
+    const uint8_t indeks = static_cast<uint8_t>(indeksBroj);
 
     unsigned int omogucen = 0;
     unsigned int sat = 0;
     unsigned int minuta = 0;
     if (sscanf(vrijednost, "%u,%u,%u", &omogucen, &sat, &minuta) != 3) {
+      return false;
+    }
+    if (!jeOmogucenSatIMinutaValjano(omogucen, sat, minuta)) {
       return false;
     }
 
@@ -573,16 +630,18 @@ bool obradiPomicneBlagdaneMegai(char* payload) {
     if (krajIndeksa == nullptr || *krajIndeksa != '\0') {
       return false;
     }
-
-    const uint8_t indeks = static_cast<uint8_t>(indeksBroj);
-    if (indeks >= BROJ_POMICNIH_BLAGDANA) {
+    if (indeksBroj >= BROJ_POMICNIH_BLAGDANA) {
       return false;
     }
+    const uint8_t indeks = static_cast<uint8_t>(indeksBroj);
 
     unsigned int omogucen = 0;
     unsigned int sat = 0;
     unsigned int minuta = 0;
     if (sscanf(vrijednost, "%u,%u,%u", &omogucen, &sat, &minuta) != 3) {
+      return false;
+    }
+    if (!jeOmogucenSatIMinutaValjano(omogucen, sat, minuta)) {
       return false;
     }
 

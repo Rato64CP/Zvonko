@@ -1,20 +1,37 @@
 // esp_web.ino - web sucelje, JSON API i OTA nadogradnja ESP32 modula toranjskog sata
 
+static bool jeValjanWebPin(const char* pin) {
+  if (pin == nullptr || strlen(pin) != WEB_PIN_DULJINA) {
+    return false;
+  }
+
+  for (size_t i = 0; i < WEB_PIN_DULJINA; ++i) {
+    if (!isDigit(pin[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static void postaviZadaniWebPin() {
+  strncpy(webPin, "2906", sizeof(webPin) - 1);
+  webPin[sizeof(webPin) - 1] = '\0';
+}
+
 void ucitajWebAutentikaciju() {
   WebAuthConfig cfg{};
   EEPROM.get(ESP_EEPROM_ADRESA_WEB, cfg);
 
-  if (cfg.potpis == WEB_AUTH_POTPIS && cfg.lozinka[0] != '\0') {
-    cfg.lozinka[WEB_LOZINKA_MAX - 1] = '\0';
-    strncpy(webLozinka, cfg.lozinka, sizeof(webLozinka) - 1);
-    webLozinka[sizeof(webLozinka) - 1] = '\0';
-    Serial.println("WEB AUTH: ucitana spremljena lozinka");
+  if (cfg.potpis == WEB_AUTH_POTPIS && jeValjanWebPin(cfg.pin)) {
+    cfg.pin[WEB_PIN_DULJINA] = '\0';
+    strncpy(webPin, cfg.pin, sizeof(webPin) - 1);
+    webPin[sizeof(webPin) - 1] = '\0';
+    Serial.println("WEB AUTH: ucitan spremljeni PIN");
     return;
   }
 
-  strncpy(webLozinka, "cista2906", sizeof(webLozinka) - 1);
-  webLozinka[sizeof(webLozinka) - 1] = '\0';
-  Serial.println("WEB AUTH: koristim zadanu lozinku");
+  postaviZadaniWebPin();
+  Serial.println("WEB AUTH: koristim zadani PIN");
 }
 
 void posaljiApiKomanduMegai(const char* naredba, const char* odgovor) {
@@ -66,19 +83,194 @@ CmdOdgovorMegai posaljiKomanduMegaiIPricekaj(const char* naredba, unsigned long 
   return CMD_ODGOVOR_TIMEOUT;
 }
 
+static const char WEB_LOGIN_STRANICA[] PROGMEM = R"HTML(
+<!doctype html>
+<html lang="hr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ZVONKO PIN</title>
+  <style>
+    :root{font-family:Arial,sans-serif;color:#172033;background:#eef2f6}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:18px}
+    form{width:min(360px,100%);background:#fff;border:1px solid #d7dee8;border-radius:8px;padding:22px;box-shadow:0 12px 36px rgba(16,24,40,.12)}
+    h1{font-size:22px;margin:0 0 16px}
+    label{display:block;font-weight:700;margin-bottom:8px}
+    input{width:100%;box-sizing:border-box;font-size:28px;letter-spacing:8px;text-align:center;padding:12px;border:1px solid #b9c3d0;border-radius:6px}
+    button{width:100%;margin-top:16px;padding:12px;border:0;border-radius:6px;background:#1d4ed8;color:#fff;font-weight:700;font-size:16px}
+    .poruka{margin-top:12px;color:#b42318;min-height:20px;font-size:14px}
+  </style>
+</head>
+<body>
+  <form method="post" action="/login">
+    <h1>ZVONKO</h1>
+    <label for="pin">PIN</label>
+    <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" autofocus>
+    <button type="submit">Ulaz</button>
+    <div class="poruka">%PORUKA%</div>
+  </form>
+</body>
+</html>
+)HTML";
+
+static IPAddress dohvatiAdresuWebKlijenta() {
+  return webPosluzitelj.client().remoteIP();
+}
+
+static WebAuthIpStanje* dohvatiIpStanje(const IPAddress& adresa) {
+  WebAuthIpStanje* slobodan = nullptr;
+  for (uint8_t i = 0; i < WEB_AUTH_IP_SLOTOVA; ++i) {
+    if (webAuthIpStanja[i].zauzet && webAuthIpStanja[i].adresa == adresa) {
+      return &webAuthIpStanja[i];
+    }
+    if (!webAuthIpStanja[i].zauzet && slobodan == nullptr) {
+      slobodan = &webAuthIpStanja[i];
+    }
+  }
+
+  if (slobodan == nullptr) {
+    slobodan = &webAuthIpStanja[0];
+  }
+
+  slobodan->adresa = adresa;
+  slobodan->promasaji = 0;
+  slobodan->blokiran = false;
+  slobodan->zauzet = true;
+  return slobodan;
+}
+
+static bool jeWebIpBlokiran(const IPAddress& adresa) {
+  WebAuthIpStanje* stanje = dohvatiIpStanje(adresa);
+  return stanje != nullptr && stanje->blokiran;
+}
+
+static void resetirajPromasajeWebIp(const IPAddress& adresa) {
+  WebAuthIpStanje* stanje = dohvatiIpStanje(adresa);
+  if (stanje == nullptr) {
+    return;
+  }
+  stanje->promasaji = 0;
+  stanje->blokiran = false;
+}
+
+static void zabiljeziPromasajWebPin(const IPAddress& adresa) {
+  WebAuthIpStanje* stanje = dohvatiIpStanje(adresa);
+  if (stanje == nullptr || stanje->blokiran) {
+    return;
+  }
+
+  if (stanje->promasaji < 255U) {
+    ++stanje->promasaji;
+  }
+  if (stanje->promasaji >= WEB_AUTH_MAX_PROMASAJA_PO_IP) {
+    stanje->blokiran = true;
+    Serial.print("WEB AUTH: blokirana IP adresa nakon pogresnih PIN pokusaja ");
+    Serial.println(adresa.toString());
+  }
+}
+
+static void posaljiLoginStranicu(const char* poruka = "") {
+  String html(FPSTR(WEB_LOGIN_STRANICA));
+  html.replace("%PORUKA%", poruka != nullptr ? poruka : "");
+  webPosluzitelj.sendHeader("Cache-Control", "no-store");
+  webPosluzitelj.send(200, "text/html", html);
+}
+
+static uint32_t napraviWebSesijskiToken() {
+  uint32_t token = esp_random();
+  if (token == 0UL) {
+    token = millis() ^ 0x5A5AA5A5UL;
+  }
+  return token;
+}
+
+static WebAuthSesija* pronadiWebSesiju(uint32_t token, const IPAddress& adresa) {
+  const unsigned long sadaMs = millis();
+  for (uint8_t i = 0; i < WEB_AUTH_SESIJA_SLOTOVA; ++i) {
+    WebAuthSesija& sesija = webAuthSesije[i];
+    if (!sesija.aktivna || sesija.token != token || !(sesija.adresa == adresa)) {
+      continue;
+    }
+    if ((sadaMs - sesija.zadnjaAktivnostMs) > WEB_AUTH_SESIJA_TIMEOUT_MS) {
+      sesija.aktivna = false;
+      return nullptr;
+    }
+    return &sesija;
+  }
+  return nullptr;
+}
+
+static bool procitajWebSesijskiTokenIzCookieja(uint32_t& token) {
+  const String cookie = webPosluzitelj.header("Cookie");
+  const int pozicija = cookie.indexOf("ZVONKOSESIJA=");
+  if (pozicija < 0) {
+    return false;
+  }
+
+  const int pocetak = pozicija + 13;
+  int kraj = cookie.indexOf(';', pocetak);
+  if (kraj < 0) {
+    kraj = cookie.length();
+  }
+  const String tokenTekst = cookie.substring(pocetak, kraj);
+  if (tokenTekst.length() == 0 || tokenTekst.length() > 8) {
+    return false;
+  }
+
+  token = static_cast<uint32_t>(strtoul(tokenTekst.c_str(), nullptr, 16));
+  return token != 0UL;
+}
+
+static bool imaValjanuWebSesiju(const IPAddress& adresa) {
+  uint32_t token = 0;
+  if (!procitajWebSesijskiTokenIzCookieja(token)) {
+    return false;
+  }
+
+  WebAuthSesija* sesija = pronadiWebSesiju(token, adresa);
+  if (sesija == nullptr) {
+    return false;
+  }
+
+  sesija->zadnjaAktivnostMs = millis();
+  return true;
+}
+
+static void otvoriWebSesiju(const IPAddress& adresa) {
+  uint8_t slot = 0;
+  for (uint8_t i = 0; i < WEB_AUTH_SESIJA_SLOTOVA; ++i) {
+    if (!webAuthSesije[i].aktivna) {
+      slot = i;
+      break;
+    }
+  }
+
+  WebAuthSesija& sesija = webAuthSesije[slot];
+  sesija.adresa = adresa;
+  sesija.token = napraviWebSesijskiToken();
+  sesija.zadnjaAktivnostMs = millis();
+  sesija.aktivna = true;
+
+  char cookie[72];
+  snprintf(cookie,
+           sizeof(cookie),
+           "ZVONKOSESIJA=%08lx; Path=/; HttpOnly; SameSite=Strict",
+           static_cast<unsigned long>(sesija.token));
+  webPosluzitelj.sendHeader("Set-Cookie", cookie);
+}
+
 bool osigurajWebAutorizaciju() {
-  if (webPosluzitelj.authenticate("admin", webLozinka)) {
+  const IPAddress adresa = dohvatiAdresuWebKlijenta();
+  if (jeWebIpBlokiran(adresa)) {
+    webPosluzitelj.send(429, "text/plain", "Ulaz je blokiran za ovu IP adresu");
+    return false;
+  }
+
+  if (imaValjanuWebSesiju(adresa)) {
     return true;
   }
 
-  // Blaga odgoda nakon pogresne prijave usporava skripte za pogadanje
-  // lozinke, ali ne remeti uobicajeni rad web dashboarda toranjskog sata.
-  const unsigned long pocetakMs = millis();
-  while ((millis() - pocetakMs) < WEB_AUTH_NEUSPJEH_ODGODA_MS) {
-    delay(1);
-    yield();
-  }
-  webPosluzitelj.requestAuthentication(BASIC_AUTH, "ZVONKO v. 1.0", "Unesite web lozinku");
+  posaljiLoginStranicu();
   return false;
 }
 
@@ -277,18 +469,20 @@ PostavkeOdgovorMegai posaljiBATPostavkeMegai(unsigned int satOd,
                                              unsigned int modOtkucavanja,
                                              unsigned int modSlavljenja,
                                              unsigned int modMrtvackog,
+                                             unsigned int vrstaPokojnickogZvona,
                                              unsigned long timeoutMs) {
   zadnjiOdgovorSustavskihPostavkiMega = POSTAVKE_ODGOVOR_CEKA;
 
-  char naredba[80];
+  char naredba[96];
   snprintf(naredba,
            sizeof(naredba),
-           "SETCFG:BAT|od=%u|do=%u|otk=%u|sl=%u|mr=%u",
+           "SETCFG:BAT|od=%u|do=%u|otk=%u|sl=%u|mr=%u|pok=%u",
            satOd,
            satDo,
            modOtkucavanja,
            modSlavljenja,
-           modMrtvackog);
+           modMrtvackog,
+           vrstaPokojnickogZvona);
   Serial.println(naredba);
 
   const unsigned long pocetakMs = millis();
@@ -380,16 +574,17 @@ void posaljiJsonPostavkiStapica(bool prisilno) {
 void posaljiJsonBATPostavki(bool prisilno) {
   osvjeziBATPostavkeMegai(prisilno);
 
-  char tijelo[240];
+  char tijelo[280];
   snprintf_P(tijelo,
              sizeof(tijelo),
-             PSTR("{\"known\":%s,\"sat_od\":%u,\"sat_do\":%u,\"otkucavanje_mode\":%u,\"slavljenje_mode\":%u,\"mrtvacko_mode\":%u}"),
+             PSTR("{\"known\":%s,\"sat_od\":%u,\"sat_do\":%u,\"otkucavanje_mode\":%u,\"slavljenje_mode\":%u,\"mrtvacko_mode\":%u,\"pokojnicko_type\":%u}"),
              megaBATPostavke.poznate ? "true" : "false",
              static_cast<unsigned>(megaBATPostavke.poznate ? megaBATPostavke.satOd : 0U),
              static_cast<unsigned>(megaBATPostavke.poznate ? megaBATPostavke.satDo : 0U),
              static_cast<unsigned>(megaBATPostavke.poznate ? megaBATPostavke.modOtkucavanja : 0U),
              static_cast<unsigned>(megaBATPostavke.poznate ? megaBATPostavke.modSlavljenja : 0U),
-             static_cast<unsigned>(megaBATPostavke.poznate ? megaBATPostavke.modMrtvackog : 0U));
+             static_cast<unsigned>(megaBATPostavke.poznate ? megaBATPostavke.modMrtvackog : 0U),
+             static_cast<unsigned>(megaBATPostavke.poznate ? megaBATPostavke.vrstaPokojnickogZvona : 0U));
   webPosluzitelj.send(200, "application/json", tijelo);
 }
 
@@ -703,7 +898,7 @@ static const char WEB_POCETNA_STRANICA[] PROGMEM = R"HTML(
 
     <section class="section">
       <h3>Pogrebne skripte</h3>
-      <p class="section-note">POKOJNIK pokrece musko zvono 2 minute, zatim nakon inercije mrtvacko 10 minuta. POKOJNICA radi isto sa zenskim zvonom.</p>
+      <p class="section-note">Vrsta pokojnickog zvona bira se u BAT postavkama: 1 je dosadasnja skripta, 2 je produljena skripta s mrtvackim 40 minuta.</p>
         <div class="script-grid">
         <article class="mini-card">
           <button id="togglePokojnik" class="toggle-btn script-btn inactive" onclick="pokreniPogrebnuSkriptu('pokojnik', '/api/pokojnik', 'POKOJNIK')">POKOJNIK</button>
@@ -1341,6 +1536,14 @@ static const char WEB_POSTAVKE_STRANICA[] PROGMEM = R"HTML(
               <option value="2">2</option>
             </select>
           </div>
+          <div class="field">
+            <label for="batPokojnickoType">Vrsta pokojnickog</label>
+            <small>1=dosadasnje, 2=produljeno s 40 minuta mrtvackog.</small>
+            <select id="batPokojnickoType">
+              <option value="1">1</option>
+              <option value="2">2</option>
+            </select>
+          </div>
         </div>
         <div class="actions">
           <button class="primary" type="button" onclick="spremiBat()">Spremi BAT</button>
@@ -1504,6 +1707,7 @@ static const char WEB_POSTAVKE_STRANICA[] PROGMEM = R"HTML(
       postaviSelect('batOtkucavanjeMode', podaci.otkucavanje_mode ?? 0);
       postaviSelect('batSlavljenjeMode', podaci.slavljenje_mode ?? 1);
       postaviSelect('batMrtvackoMode', podaci.mrtvacko_mode ?? 1);
+      postaviSelect('batPokojnickoType', podaci.pokojnicko_type ?? 1);
     }
 
     function popuniSunce(podaci) {
@@ -1650,15 +1854,16 @@ static const char WEB_POSTAVKE_STRANICA[] PROGMEM = R"HTML(
     }
 
     async function spremiBat() {
-      let satOd, satDo, otk, sl, mr;
+      let satOd, satDo, otk, sl, mr, pok;
       try {
         satOd = procitajBroj('batSatOd', 0, 23, 1);
         satDo = procitajBroj('batSatDo', 0, 23, 1);
         otk = procitajOdabraniBroj('batOtkucavanjeMode', [0, 1, 2]);
         sl = procitajOdabraniBroj('batSlavljenjeMode', [1, 2]);
         mr = procitajOdabraniBroj('batMrtvackoMode', [1, 2]);
+        pok = procitajOdabraniBroj('batPokojnickoType', [1, 2]);
       } catch (greska) {
-        postaviLog('Provjeri BAT postavke: sati moraju biti 0-23, OTK 0-2, a S i M 1-2.');
+        postaviLog('Provjeri BAT postavke: sati moraju biti 0-23, OTK 0-2, a S, M i POK 1-2.');
         return;
       }
 
@@ -1672,7 +1877,8 @@ static const char WEB_POSTAVKE_STRANICA[] PROGMEM = R"HTML(
             do: String(satDo),
             otk: String(otk),
             sl: String(sl),
-            mr: String(mr)
+            mr: String(mr),
+            pok: String(pok)
           }),
           cache: 'no-store'
         });
@@ -1899,7 +2105,7 @@ static const char WEB_BLAGDANI_STRANICA[] PROGMEM = R"HTML(
   <div class="wrap">
     <div class="panel">
       <h1>Blagdani toranjskog sata</h1>
-<p class="intro">Na ovoj stranici toranjskog sata unose se redovite dnevne i nedjeljne mise, kao i posebni nepomični i pomični blagdani. Dnevna misa pokreće samo muško zvono 30 minuta prije mise, a nedjeljna i blagdanska misa pokreću oba zvona 2 sata i 1 sat prije mise, bez dodatnog slavljenja. Sva ta zvonjenja startaju u 25. sekundi minute, kao i čitanje čavala okretne ploče.</p>
+<p class="intro">Na ovoj stranici toranjskog sata unose se redovite dnevne i nedjeljne mise, kao i posebni nepomični i pomični blagdani. Dnevna misa pokreće samo muško zvono 30 minuta prije mise, a nedjeljna i blagdanska misa pokreću oba zvona 2 sata i 1 sat prije mise, bez dodatnog slavljenja. Zvonjenja su vezana na ciljnu minutu i čekaju slobodnu mehaniku ako tada traje otkucavanje, zvono ili inercija.</p>
 
       <div class="section" style="margin-top:0;padding-top:0;border-top:none;">
         <h2>Redovite mise</h2>
@@ -1976,7 +2182,7 @@ static const char WEB_BLAGDANI_STRANICA[] PROGMEM = R"HTML(
     function osvjeziTekstBlagdanskeStranice() {
       const intro = document.querySelector('.intro');
       if (intro) {
-        intro.textContent = 'Na ovoj stranici toranjskog sata unose se redovite dnevne i nedjeljne mise te ukljucenje i vrijeme vec zadanih blagdana. Dnevna misa pokrece samo musko zvono 30 minuta prije mise, a nedjeljna i blagdanska misa pokrecu oba zvona 2 sata i 1 sat prije mise, bez dodatnog slavljenja. Sva ta zvonjenja startaju u 25. sekundi minute, kao i citanje cavala okretne ploce.';
+        intro.textContent = 'Na ovoj stranici toranjskog sata unose se redovite dnevne i nedjeljne mise te ukljucenje i vrijeme vec zadanih blagdana. Dnevna misa pokrece samo musko zvono 30 minuta prije mise, a nedjeljna i blagdanska misa pokrecu oba zvona 2 sata i 1 sat prije mise, bez dodatnog slavljenja. Zvonjenja su vezana na ciljnu minutu i cekaju slobodnu mehaniku ako tada traje otkucavanje, zvono ili inercija.';
       }
 
       const sectionTitles = document.querySelectorAll('.section h2');
@@ -2411,6 +2617,60 @@ void obradiOtaUpload() {
 }
 
 void konfigurirajWebPosluzitelj() {
+  const char* headeri[] = {"Cookie"};
+  webPosluzitelj.collectHeaders(headeri, 1);
+
+  Serial.println("WEB: Registriram /login rutu");
+  webPosluzitelj.on("/login", HTTP_GET, []() {
+    if (setupApAktivan) {
+      posaljiHtmlStranicuIzProgMema(WEB_SETUP_STRANICA);
+      return;
+    }
+    const IPAddress adresa = dohvatiAdresuWebKlijenta();
+    if (jeWebIpBlokiran(adresa)) {
+      webPosluzitelj.send(429, "text/plain", "Ulaz je blokiran za ovu IP adresu");
+      return;
+    }
+    posaljiLoginStranicu();
+  });
+  webPosluzitelj.on("/login", HTTP_POST, []() {
+    if (setupApAktivan) {
+      webPosluzitelj.send(409, "text/plain", "Setup WiFi mreza je aktivna");
+      return;
+    }
+
+    const IPAddress adresa = dohvatiAdresuWebKlijenta();
+    if (jeWebIpBlokiran(adresa)) {
+      webPosluzitelj.send(429, "text/plain", "Ulaz je blokiran za ovu IP adresu");
+      return;
+    }
+
+    String uneseniPin = webPosluzitelj.hasArg("pin") ? webPosluzitelj.arg("pin") : "";
+    uneseniPin.trim();
+    if (uneseniPin.length() != WEB_PIN_DULJINA || !jeValjanWebPin(uneseniPin.c_str()) ||
+        strcmp(uneseniPin.c_str(), webPin) != 0) {
+      zabiljeziPromasajWebPin(adresa);
+
+      const unsigned long pocetakMs = millis();
+      while ((millis() - pocetakMs) < WEB_AUTH_NEUSPJEH_ODGODA_MS) {
+        delay(1);
+        yield();
+      }
+
+      if (jeWebIpBlokiran(adresa)) {
+        webPosluzitelj.send(429, "text/plain", "Ulaz je blokiran za ovu IP adresu");
+        return;
+      }
+      posaljiLoginStranicu("Neispravan PIN");
+      return;
+    }
+
+    resetirajPromasajeWebIp(adresa);
+    otvoriWebSesiju(adresa);
+    webPosluzitelj.sendHeader("Location", "/");
+    webPosluzitelj.send(303, "text/plain", "OK");
+  });
+
   Serial.println("WEB: Registriram / rutu");
   webPosluzitelj.on("/", []() {
     if (setupApAktivan) {
@@ -2696,12 +2956,18 @@ void konfigurirajWebPosluzitelj() {
     const String otkArg = ocistiJednolinijskiTekst(webPosluzitelj.arg("otk"), 1);
     const String slArg = ocistiJednolinijskiTekst(webPosluzitelj.arg("sl"), 1);
     const String mrArg = ocistiJednolinijskiTekst(webPosluzitelj.arg("mr"), 1);
+    const String pokArg = webPosluzitelj.hasArg("pok")
+                              ? ocistiJednolinijskiTekst(webPosluzitelj.arg("pok"), 1)
+                              : String(megaBATPostavke.poznate
+                                           ? static_cast<unsigned>(megaBATPostavke.vrstaPokojnickogZvona)
+                                           : 1U);
 
     if (!(jeDecimalniBrojString(odArg) &&
           jeDecimalniBrojString(doArg) &&
           jeDecimalniBrojString(otkArg) &&
           jeDecimalniBrojString(slArg) &&
-          jeDecimalniBrojString(mrArg))) {
+          jeDecimalniBrojString(mrArg) &&
+          jeDecimalniBrojString(pokArg))) {
       webPosluzitelj.send(422, "text/plain", "BAT postavke moraju biti cijeli brojevi");
       return;
     }
@@ -2711,11 +2977,13 @@ void konfigurirajWebPosluzitelj() {
     const long otk = otkArg.toInt();
     const long sl = slArg.toInt();
     const long mr = mrArg.toInt();
+    const long pok = pokArg.toInt();
     if (satOd < 0L || satOd > 23L || satDo < 0L || satDo > 23L ||
         otk < 0L || otk > 2L ||
         (sl != 1L && sl != 2L) ||
-        (mr != 1L && mr != 2L)) {
-      webPosluzitelj.send(422, "text/plain", "BAT podrzava sate 0-23, OTK 0-2 te modove S i M 1-2");
+        (mr != 1L && mr != 2L) ||
+        (pok != 1L && pok != 2L)) {
+      webPosluzitelj.send(422, "text/plain", "BAT podrzava sate 0-23, OTK 0-2 te modove S, M i POK 1-2");
       return;
     }
 
@@ -2725,6 +2993,7 @@ void konfigurirajWebPosluzitelj() {
         static_cast<unsigned int>(otk),
         static_cast<unsigned int>(sl),
         static_cast<unsigned int>(mr),
+        static_cast<unsigned int>(pok),
         CMD_CEKANJE_NA_MEGU_MS);
 
     if (status == POSTAVKE_ODGOVOR_OK) {
@@ -3128,6 +3397,18 @@ void konfigurirajWebPosluzitelj() {
       return;
     }
     posaljiApiKomanduMegai("TIHI_OFF", "Tihi mod iskljucen");
+  });
+  webPosluzitelj.on("/api/relays/inverted/on", HTTP_GET, []() {
+    if (!osigurajWebAutorizaciju()) {
+      return;
+    }
+    posaljiApiKomanduMegai("RELEJI_OBRNUTO_ON", "Izlazni releji D22-D29 postavljeni na aktivno-LOW");
+  });
+  webPosluzitelj.on("/api/relays/inverted/off", HTTP_GET, []() {
+    if (!osigurajWebAutorizaciju()) {
+      return;
+    }
+    posaljiApiKomanduMegai("RELEJI_OBRNUTO_OFF", "Izlazni releji D22-D29 postavljeni na aktivno-HIGH");
   });
 
   webPosluzitelj.onNotFound([]() {

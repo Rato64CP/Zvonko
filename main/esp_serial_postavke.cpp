@@ -75,6 +75,20 @@ bool parsirajIntPoljeSustava(const char* vrijednost, int& izlaz) {
   return true;
 }
 
+bool jeUIntURasponu(unsigned int vrijednost, unsigned int najmanje, unsigned int najvise) {
+  return vrijednost >= najmanje && vrijednost <= najvise;
+}
+
+bool jeSatIMinutaValjano(unsigned int sat, unsigned int minuta) {
+  return sat <= 23U && minuta <= 59U;
+}
+
+bool jeOmogucenSatIMinutaValjano(unsigned int omogucen,
+                                 unsigned int sat,
+                                 unsigned int minuta) {
+  return omogucen <= 1U && jeSatIMinutaValjano(sat, minuta);
+}
+
 }  // namespace
 
 void posaljiSustavskePostavkeESPu() {
@@ -105,15 +119,16 @@ void posaljiPostavkeStapicaESPu() {
 }
 
 void posaljiBATPostavkeESPu() {
-  char linija[72];
+  char linija[88];
   snprintf_P(linija,
              sizeof(linija),
-             PSTR("SET:BAT|od=%d|do=%d|otk=%u|sl=%u|mr=%u"),
+             PSTR("SET:BAT|od=%d|do=%d|otk=%u|sl=%u|mr=%u|pok=%u"),
              dohvatiBATPeriodOdSata(),
              dohvatiBATPeriodDoSata(),
              static_cast<unsigned>(dohvatiModOtkucavanja()),
              static_cast<unsigned>(dohvatiModSlavljenja()),
-             static_cast<unsigned>(dohvatiModMrtvackog()));
+             static_cast<unsigned>(dohvatiModMrtvackog()),
+             static_cast<unsigned>(dohvatiVrstuPokojnickogZvona()));
   espSerijskiPort.println(linija);
 }
 
@@ -277,6 +292,9 @@ bool spremiSustavskePostavkeIzESPa(char* payload) {
       !inr1Poznat || !inr2Poznat || !impulsPoznat) {
     return false;
   }
+  if (!jeUIntURasponu(inr1, 0U, 255U) || !jeUIntURasponu(inr2, 0U, 255U)) {
+    return false;
+  }
 
   postaviLCDPozadinskoOsvjetljenje(lcdUkljuceno);
   postaviPCLogiranjeOmoguceno(logOmogucen);
@@ -352,6 +370,12 @@ bool spremiPostavkeStapicaIzESPa(char* payload) {
       !trajanjeSlavljenjaPoznato || !odgodaPoznata) {
     return false;
   }
+  if (!jeUIntURasponu(trajanjeRadni, 0U, 255U) ||
+      !jeUIntURasponu(trajanjeNedjelja, 0U, 255U) ||
+      !jeUIntURasponu(trajanjeSlavljenja, 0U, 255U) ||
+      !jeUIntURasponu(odgoda, 0U, 255U)) {
+    return false;
+  }
 
   postaviPostavkeCavala(static_cast<uint8_t>(trajanjeRadni),
                         static_cast<uint8_t>(trajanjeNedjelja),
@@ -380,6 +404,7 @@ bool spremiBATPostavkeIzESPa(char* payload) {
   unsigned int modOtkucavanja = 0;
   unsigned int modSlavljenja = 0;
   unsigned int modMrtvackog = 0;
+  unsigned int vrstaPokojnickogZvona = dohvatiVrstuPokojnickogZvona();
   bool satOdPoznat = false;
   bool satDoPoznat = false;
   bool modOtkucavanjaPoznat = false;
@@ -418,6 +443,8 @@ bool spremiBATPostavkeIzESPa(char* payload) {
     } else if (strcmp(kljuc, "mr") == 0) {
       if (!parsirajUIntPoljeSustava(vrijednost, modMrtvackog)) return false;
       modMrtvackogPoznat = true;
+    } else if (strcmp(kljuc, "pok") == 0) {
+      if (!parsirajUIntPoljeSustava(vrijednost, vrstaPokojnickogZvona)) return false;
     } else {
       return false;
     }
@@ -427,23 +454,32 @@ bool spremiBATPostavkeIzESPa(char* payload) {
       !modSlavljenjaPoznat || !modMrtvackogPoznat) {
     return false;
   }
+  if (satOd < 0 || satOd > 23 || satDo < 0 || satDo > 23 ||
+      !jeUIntURasponu(modOtkucavanja, 0U, 2U) ||
+      !jeUIntURasponu(modSlavljenja, 1U, 2U) ||
+      !jeUIntURasponu(modMrtvackog, 1U, 2U) ||
+      !jeUIntURasponu(vrstaPokojnickogZvona, 1U, 2U)) {
+    return false;
+  }
 
   postaviKompaktnePostavkeOtkucavanja(
       satOd,
       satDo,
       static_cast<uint8_t>(modOtkucavanja),
       static_cast<uint8_t>(modSlavljenja),
-      static_cast<uint8_t>(modMrtvackog));
+      static_cast<uint8_t>(modMrtvackog),
+      static_cast<uint8_t>(vrstaPokojnickogZvona));
 
-  char log[112];
+  char log[128];
   snprintf_P(log,
              sizeof(log),
-             PSTR("Mrezni most je spremio BAT postavke: od=%d do=%d OTK=%u S=%u M=%u"),
+             PSTR("Mrezni most je spremio BAT postavke: od=%d do=%d OTK=%u S=%u M=%u POK=%u"),
              satOd,
              satDo,
              modOtkucavanja,
              modSlavljenja,
-             modMrtvackog);
+             modMrtvackog,
+             vrstaPokojnickogZvona);
   posaljiPCLog(log);
   return true;
 }
@@ -527,6 +563,11 @@ bool spremiSuncevePostavkeIzESPa(char* payload) {
       !nocnaRasvjetaPoznata) {
     return false;
   }
+  if (!jeUIntURasponu(jutroZvono, 0U, 2U) ||
+      !jeUIntURasponu(podneZvono, 0U, 2U) ||
+      !jeUIntURasponu(vecerZvono, 0U, 2U)) {
+    return false;
+  }
 
   postaviSuncevDogadaj(
       SUNCEVI_DOGADAJ_JUTRO,
@@ -594,6 +635,9 @@ bool spremiMisePostavkeIzESPa(char* payload) {
     if (sscanf_P(vrijednost, PSTR("%u,%u,%u"), &omogucena, &sat, &minuta) != 3) {
       return false;
     }
+    if (!jeOmogucenSatIMinutaValjano(omogucena, sat, minuta)) {
+      return false;
+    }
 
     if (strcmp(kljuc, "rd") == 0) {
       redoviteMise.dnevnaOmogucena = omogucena != 0;
@@ -658,16 +702,18 @@ bool spremiNepomicneBlagdaneIzESPa(char* payload) {
     if (krajIndeksa == nullptr || *krajIndeksa != '\0') {
       return false;
     }
-
-    const uint8_t indeks = static_cast<uint8_t>(indeksBroj);
-    if (indeks >= BROJ_NEPOMICNIH_BLAGDANA) {
+    if (indeksBroj >= BROJ_NEPOMICNIH_BLAGDANA) {
       return false;
     }
+    const uint8_t indeks = static_cast<uint8_t>(indeksBroj);
 
     unsigned int omogucen = 0;
     unsigned int sat = 0;
     unsigned int minuta = 0;
     if (sscanf_P(vrijednost, PSTR("%u,%u,%u"), &omogucen, &sat, &minuta) != 3) {
+      return false;
+    }
+    if (!jeOmogucenSatIMinutaValjano(omogucen, sat, minuta)) {
       return false;
     }
 
@@ -730,16 +776,18 @@ bool spremiPomicneBlagdaneIzESPa(char* payload) {
     if (krajIndeksa == nullptr || *krajIndeksa != '\0') {
       return false;
     }
-
-    const uint8_t indeks = static_cast<uint8_t>(indeksBroj);
-    if (indeks >= BROJ_POMICNIH_BLAGDANA) {
+    if (indeksBroj >= BROJ_POMICNIH_BLAGDANA) {
       return false;
     }
+    const uint8_t indeks = static_cast<uint8_t>(indeksBroj);
 
     unsigned int omogucen = 0;
     unsigned int sat = 0;
     unsigned int minuta = 0;
     if (sscanf_P(vrijednost, PSTR("%u,%u,%u"), &omogucen, &sat, &minuta) != 3) {
+      return false;
+    }
+    if (!jeOmogucenSatIMinutaValjano(omogucen, sat, minuta)) {
       return false;
     }
 
