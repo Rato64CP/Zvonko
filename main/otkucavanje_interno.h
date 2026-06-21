@@ -19,3 +19,6 @@ void deaktivirajObaCekicaZaPosebniNacin();
 
 // Provjera stvarnog sigurnosnog stanja cekica nakon softverskog limita.
 bool jeCekicSigurnosnoAktivanZaPosebniNacin(int pin);
+
+// Provjera treba li lampica pripadnog zvona ostati upaljena dok bat ima impuls.
+bool jeCekicLampiceZvonaAktivan(int zvono);

@@ -157,6 +157,25 @@ int dohvatiIndeksCekicaZaPin(int pin) {
   return -1;
 }
 
+int dohvatiPinLampiceZvonaZaCekic(int pin) {
+  if (pin == PIN_CEKIC_MUSKI) {
+    return PIN_LAMPICA_ZVONO_1;
+  }
+  if (pin == PIN_CEKIC_ZENSKI) {
+    return PIN_LAMPICA_ZVONO_2;
+  }
+  return -1;
+}
+
+void postaviLampicuZvonaZaCekic(int pin, bool ukljuci) {
+  const int pinLampice = dohvatiPinLampiceZvonaZaCekic(pin);
+  if (pinLampice < 0) {
+    return;
+  }
+
+  digitalWrite(static_cast<uint8_t>(pinLampice), ukljuci ? HIGH : LOW);
+}
+
 unsigned long normalizirajSigurnoTrajanjeCekicaMs(unsigned long trazenoTrajanjeMs,
                                                   unsigned long sigurnosniMaxMs) {
   if (trazenoTrajanjeMs == 0UL) {
@@ -181,6 +200,7 @@ void aktivirajCekic_Internal(int pin,
   }
 
   postaviIzlazniRelej(static_cast<uint8_t>(pin), true);
+  postaviLampicuZvonaZaCekic(pin, true);
   sigurnostCekica.aktivan[indeks] = true;
   sigurnostCekica.vrijemeAktivacijeUs[indeks] = micros();
   sigurnostCekica.trajanjeUs[indeks] = pretvoriTrajanjeCekicaUMikrosekunde(
@@ -194,6 +214,7 @@ void deaktivirajCekic_Internal(int pin) {
   }
 
   postaviIzlazniRelej(static_cast<uint8_t>(pin), false);
+  postaviLampicuZvonaZaCekic(pin, false);
   sigurnostCekica.aktivan[indeks] = false;
   sigurnostCekica.vrijemeAktivacijeUs[indeks] = 0UL;
   sigurnostCekica.trajanjeUs[indeks] = 0UL;
@@ -383,6 +404,14 @@ void aktivirajObaCekicaZaPosebniNacin(unsigned long trazenoTrajanjeMs) {
 bool jeCekicSigurnosnoAktivanZaPosebniNacin(int pin) {
   const int indeks = dohvatiIndeksCekicaZaPin(pin);
   return (indeks >= 0) ? sigurnostCekica.aktivan[indeks] : false;
+}
+
+bool jeCekicLampiceZvonaAktivan(int zvono) {
+  if (zvono < 1 || zvono > 2) {
+    return false;
+  }
+
+  return sigurnostCekica.aktivan[zvono - 1];
 }
 
 void otkucajSate(int broj) {

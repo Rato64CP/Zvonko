@@ -173,6 +173,8 @@ static void osvjeziLampicuZvona(int indeks, unsigned long sadaMs) {
         ((sadaMs / INTERVAL_TREPTANJA_LAMPICE_INERCIJE_MS) % 2UL) == 0UL;
   } else if (zvona.aktivan[indeks]) {
     lampicaUkljucena = true;
+  } else if (jeCekicLampiceZvonaAktivan(indeks + 1)) {
+    lampicaUkljucena = true;
   }
 
   digitalWrite(PINOVI_LAMPICA_ZVONA[indeks], lampicaUkljucena ? HIGH : LOW);
